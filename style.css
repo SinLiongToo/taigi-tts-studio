@@ -588,6 +588,23 @@ input[type="range"] {
   100% { transform: scale(1); opacity: 0.9; }
 }
 
+.sample-btn-group {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.token-chip.roman-origin {
+  border-style: dashed;
+}
+
+.token-hanzi.roman-hanzi-hint {
+  font-size: 11px;
+  opacity: 0.85;
+  color: var(--primary);
+  font-weight: 600;
+}
+
 /* 正在讀到的詞塊高亮光暈 */
 .token-chip.speaking-now {
   background-color: #fef08a !important;

@@ -10,6 +10,7 @@ server.py - 台語多模型語音合成 Studio 後端伺服器 (Taigi TTS FastAP
 
 import os
 import io
+import re
 import json
 import asyncio
 from typing import Optional, List, Dict, Any
@@ -24,18 +25,33 @@ from edge_engine import EdgeTtsEngine, SUPPORTED_VOICES
 # 載入教育部台語真人錄音索引 (14,489 筆官方原聲)
 MOE_INDEX_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "moe_audio_index.json")
 moe_audio_index = {}
+moe_rom_index = {}
 if os.path.exists(MOE_INDEX_PATH):
     try:
         with open(MOE_INDEX_PATH, "r", encoding="utf-8") as f:
             moe_audio_index = json.load(f)
+        for title, info in moe_audio_index.items():
+            trs = info.get("trs", "")
+            if trs:
+                parts = [parse_syllable(p) for p in re.split(r'-+', trs.strip()) if p]
+                if parts and all(s is not None for s in parts):
+                    key = "-".join([f"{s.skeleton}{s.tone}" for s in parts])
+                    if key not in moe_rom_index:
+                        moe_rom_index[key] = {
+                            "hanzi": title,
+                            "id": info["id"],
+                            "trs": trs
+                        }
     except Exception as e:
         print(f"載入教育部音檔索引失敗: {e}")
 
 
-def resolve_moe_audio(word: str) -> Optional[str]:
-    """取得教育部官方真人錄音音檔 CDN 網址"""
+def resolve_moe_audio(word: str, rom_key: Optional[str] = None) -> Optional[str]:
+    """取得教育部官方真人錄音音檔 CDN 網址 (支援漢字與羅馬字 key 反查)"""
     if word in moe_audio_index:
         return f"https://r2-assets.moedict.tw/audio/t/{moe_audio_index[word]['id']}.mp3"
+    if rom_key and rom_key in moe_rom_index:
+        return f"https://r2-assets.moedict.tw/audio/t/{moe_rom_index[rom_key]['id']}.mp3"
     return None
 
 app = FastAPI(
@@ -150,16 +166,38 @@ async def parse_text(req: ParseRequest):
         tailo_sandhi = g2p_pipeline.convert_to_sandhi_tailo(raw_s)
         poj_sandhi = g2p_pipeline.convert_to_sandhi_poj(raw_s)
         tokens = g2p_pipeline.parse_sentence_to_tokens(raw_s)
-        # 為每個 token 注入教育部真人原聲音檔網址
+        # 為每個 token 注入教育部真人原聲音檔網址 (支援漢字與全羅反查)
         for t in tokens:
             if t.get("type") == "word":
                 w = t.get("hanzi", "")
-                audio_url = resolve_moe_audio(w)
+                tailo = t.get("tailo_base", "")
+                rom_key = None
+                if tailo:
+                    sylls = [parse_syllable(p) for p in re.split(r'-+', tailo) if p]
+                    if sylls and all(s is not None for s in sylls):
+                        rom_key = "-".join([f"{s.skeleton}{s.tone}" for s in sylls])
+
+                audio_url = resolve_moe_audio(w, rom_key)
+                if t.get("is_roman") and rom_key and rom_key in moe_rom_index:
+                    t["matched_hanzi"] = moe_rom_index[rom_key]["hanzi"]
+
                 t["audio_url"] = audio_url
-                # 若無整詞錄音，提供逐字備援音檔
-                if not audio_url and len(w) > 1:
-                    char_audios = [resolve_moe_audio(ch) for ch in w if resolve_moe_audio(ch)]
-                    t["fallback_audios"] = char_audios
+
+                # 若無整詞錄音，提供逐音節備援音檔
+                if not audio_url:
+                    parts = []
+                    if t.get("is_roman") and tailo:
+                        sub_sylls = [parse_syllable(p) for p in re.split(r'-+', tailo) if p]
+                        for s in sub_sylls:
+                            if s:
+                                k = f"{s.skeleton}{s.tone}"
+                                u = resolve_moe_audio("", k)
+                                if u:
+                                    parts.append(u)
+                    elif len(w) > 1:
+                        parts = [resolve_moe_audio(ch) for ch in w if resolve_moe_audio(ch)]
+                    if parts:
+                        t["fallback_audios"] = parts
 
         results.append({
             "index": item["index"],

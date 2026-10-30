@@ -127,6 +127,32 @@ class TestTaigiTTS(unittest.TestCase):
         data = res.json()
         self.assertGreaterEqual(len(data["sentences"]), 1)
 
+    def test_direct_romanization_parsing(self):
+        """測試直接輸入全羅 (Tâi-lô)、白話字 (POJ) 與數字調的解析與變調"""
+        # 1. 教育部台羅符號調
+        tailo_input = "Tâi-oân chá-tshī-á ê tsu-bī."
+        tokens = self.pipeline.parse_sentence_to_tokens(tailo_input)
+        word_tokens = [t for t in tokens if t.get("type") == "word"]
+        self.assertGreaterEqual(len(word_tokens), 4)
+        self.assertTrue(word_tokens[0].get("is_roman"))
+        self.assertEqual(word_tokens[0]["tailo_base"], "tâi-uân")
+        self.assertEqual(word_tokens[0]["tailo_sandhi"], "tāi-uân")  # 5 -> 7 變調
+
+        # 2. 直接輸入白話字 (POJ) 轉變調 POJ
+        poj_input = "Tâi-oân chá-chhī-á ê chu-bī."
+        poj_sandhi = self.pipeline.convert_to_sandhi_poj(poj_input)
+        self.assertIn("tāi-oân", poj_sandhi.lower())
+        self.assertIn("cha-chhì-á", poj_sandhi.lower())
+
+        # 3. 測試後端 API 支援全羅並反查教育部官方錄音檔
+        res = self.client.post("/api/g2p/parse", json={"text": "tsu-bī"})
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        words = [t for s in data["sentences"] for t in s["tokens"] if t.get("type") == "word"]
+        self.assertEqual(len(words), 1)
+        self.assertIsNotNone(words[0].get("audio_url"))
+        self.assertIn("08630", words[0]["audio_url"])  # 滋味 official ID
+
 
 if __name__ == '__main__':
     unittest.main()

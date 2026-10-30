@@ -390,9 +390,7 @@ class TaigiTextPipeline:
         tokens = []
 
         for w in words:
-            if not taibun.is_cjk(w):
-                tokens.append({"type": "literal", "text": w})
-            else:
+            if taibun.is_cjk(w):
                 tailo_base = self.g2p_raw(w, system="Tailo").lower()
                 tailo_sandhi = self.convert_to_sandhi_tailo(w).lower()
                 poj_base = self.g2p_raw(w, system="POJ").lower()
@@ -406,8 +404,38 @@ class TaigiTextPipeline:
                     "tailo_sandhi": tailo_sandhi,
                     "poj_base": poj_base,
                     "poj_sandhi": poj_sandhi,
-                    "has_sandhi": has_sandhi
+                    "has_sandhi": has_sandhi,
+                    "is_roman": False
                 })
+            elif re.search(r'[a-zA-Z\u00C0-\u024F\u0300-\u036F\u1E00-\u1EFF·͘ⁿ]', w):
+                # 🌟 支援全羅（Tâi-lô）、白話字（POJ）與數字調直接輸入
+                clean_w = w.strip()
+                sub_parts = [p for p in re.split(r'-+', clean_w) if p]
+                parsed_sylls = [parse_syllable(p) for p in sub_parts]
+
+                if parsed_sylls and all(s is not None for s in parsed_sylls):
+                    sandhi_sylls = apply_sandhi_to_word(parsed_sylls, self.dialect)
+                    tailo_base = "-".join([skeleton_to_tailo(s.skeleton, s.tone) for s in parsed_sylls])
+                    tailo_sandhi = "-".join([skeleton_to_tailo(s.skeleton, s.tone) for s in sandhi_sylls])
+                    poj_base = "-".join([skeleton_to_poj(s.skeleton, s.tone) for s in parsed_sylls])
+                    poj_sandhi = "-".join([skeleton_to_poj(s.skeleton, s.tone) for s in sandhi_sylls])
+                    has_sandhi = (tailo_base != tailo_sandhi)
+
+                    tokens.append({
+                        "type": "word",
+                        "hanzi": w,
+                        "roman_input": w,
+                        "tailo_base": tailo_base,
+                        "tailo_sandhi": tailo_sandhi,
+                        "poj_base": poj_base,
+                        "poj_sandhi": poj_sandhi,
+                        "has_sandhi": has_sandhi,
+                        "is_roman": True
+                    })
+                else:
+                    tokens.append({"type": "literal", "text": w})
+            else:
+                tokens.append({"type": "literal", "text": w})
 
         return tokens
 
@@ -418,8 +446,8 @@ def split_article_into_sentences(text: str, max_chunk_len: int = 120) -> List[Di
     將 500～3000 字以上的長篇文章切分成語義完整、適合神經網路與拼接 TTS 合成的句子。
     依標點符號優先順序進行分段，防止過長句子導致音訊模型截斷或記憶體暴增。
     """
-    # 標點分割正則（包含換行、句末標點、分號等）
-    raw_sentences = re.split(r'([。！？!?\n\r]+)', text)
+    # 標點分割正則（包含換行、句末標點、分號等，以及英文/全羅句尾 . ）
+    raw_sentences = re.split(r'([。！？!?\n\r]+|(?<=[a-zA-Z0-9\u0300-\u0358\u207f])\.\s+)', text)
     chunks = []
     curr_text = ""
 

@@ -30,6 +30,8 @@
   const articleInput = el('articleInput');
   const charCounter = el('charCounter');
   const loadSampleBtn = el('loadSampleBtn');
+  const loadTailoSampleBtn = el('loadTailoSampleBtn');
+  const loadPojSampleBtn = el('loadPojSampleBtn');
   const clearTextBtn = el('clearTextBtn');
 
   const playBtn = el('playBtn');
@@ -108,6 +110,32 @@
 市仔尾猶有一擔賣水果的，紅豔豔的王梨、金黃色的愛文檨仔，佮青翠的芭樂整整齊齊排佇案桌頂。頭家手攑著果刀，隨手削了一塊芭樂請路過的阿伯試食：「阿伯，先食一塊看覓，有甜才買，無甜免錢！」這款大方閣自在的待客之道，就是台灣上美、上純樸的人情風景。
 
 行出市場，天已經大光，日頭金熾熾照佇滿載而歸的菜籃仔內。手中提著滿滿的菜蔬魚肉，心內嘛裝滿了溫暖。這个充滿活力的市仔，陪伴著逐一代台灣儂過日子，將土地的滋味佮人心的溫度，一代接一代傳承落去。`;
+
+  // 全羅 (教育部台羅 Tâi-lô 500+ 字長文範例)
+  const SAMPLE_ARTICLE_TAILO = `Tâi-oân chá-tshī-á ê tsu-bī kap jîn-tsîng-bī
+
+Thàu-tsá gōo-tiám guā, thinn iáu-bē kng, ke-á-lōo ê chá-tshī-á tō í-king jia̍t-liat-kún-kún. Tshài-huàn the-tshia ji̍p-khì hāng-á-kháu, hî-huàn kā thàu-tsá tuì káng-kháu tsài--lâi ê hiān-lô hî-hê tsi̍t-puânn tsi̍t-puânn pâi-tsiâu-tsiâu, tíng-thâu iáu hâm-tio̍h tshuì-ping, thàu-tshut hōo lâng sim-liâng-pî-thàu-khui ê tshinn-tinn-bī. Bē-tshài ê oo-bá-sáng iōng i tshin-tshiat iū tuā-siann ê âu-lông huah: "Ta̍k-ke kín lâi bé--ooh! Tsit lia̍p ko-lê-tshài sī Lê-suann kng sàng--lo̍h-lâi ê, tshè koh tinn, bô bé lí ē hiō-hué!"
+
+Uán tsi̍t ê uan, kiânn-ji̍p-khì bē sio-tsia̍h ê jia̍t-liat-khu, bah-uân-á, mī-suànn-kôo, bí-ko ê phang-bī suî phīnn phiau--kuè-lâi. Hit ê bē bí-ko ê tuā-tsik, siang-tshiú bô thîng--kuè, tsi̍t uán suà tsi̍t uán lîm bah-sòo, sap phang-tshài, tsham lóo-nn̄g. Tsē tī înn-toh-á pinn tsia̍h tsá-tǹg ê a-peh, tsi̍t-tshiú the̍h tī, tsi̍t-tshiú hian pò-tsuá, khuànn-tio̍h si̍k-sāi ê keh-piah lí-tiúnn kiânn--kuè, suî huah kóng: "Lí-tiúnn, lâi--lah! Tsit uán guá tshiánn, tsē--lo̍h-lâi tsia̍h tsi̍t uán sio-mī!" Tsit-khuán m̄-bián kheh-khì, ti̍t-tsia̍t-liáu-tòng ê jia̍t-tsîng, sī chá-tshī-á to̍k-iú ê ua̍h-li̍k.
+
+Kiânn kàu ke-bué ê hīng-jîn-tê-tuànn, tsio̍h-bō bō--tshut-lâi ê hīng-jîn-tsiunn kún kah ti̍t-ti̍t phú-ian, lāu-a-peh tsiūnn-tshiú gia̍h tn̂g-tī, khin-khin ngeh-khí iû-tsia̍h-kué, tsi̍t-tsiat tsi̍t-tsiat tsim--lo̍h-khì kún-sio ê hīng-jîn-tê lāi-té, bî-tinn bî-khóo, he sī kóo-tsá nî-tāi sûn-phok ê tsu-bī. Siàu-liân-lâng tiám-thâu tshiò kóng: "Bô m̄-tio̍h, tō sī tsit bī! Tsi̍t kang nā bô tsia̍h--tio̍h, kui sin-khu lóng bô-la̍t!"
+
+Chá-tshī-á m̄-nā sī bé-tshài bé-bah ê sóo-tsāi, i kìng-ka sī tsng-thâu lîn-lí tsîng-kám kau-liû ê sim-tsōng. Put-kuán sī tshit, peh-tsa̍p huè ê lāu-tuā-lâng, ia̍h-sī khan-tio̍h gín-á ê hāu-senn pē-bú, ta̍k-ke tī tsia sio-tú, lóng ē thîng--lo̍h-lâi khai-káng sann kuí kù. "Lí kin-á-ji̍t ê khuì-sik tsin hó--ooh!" "Tsa-mî hit tiûnn hōo lo̍h kah tsin tuā, tshân-ni̍h ê tshài m̄-tsai kám ū phah-sún?" "Lín sun-á kin-nî khó tāi-ha̍k, tha̍k tó tsi̍t king ha̍k-hāu?" Ta̍k kù kuan-sim lóng thàu-tshut un-luán ê jîn-tsîng.
+
+Tse tō sī Tâi-oân ê chá-tshī-á, tshiong-buán thóo-tē ê sìnn-miā-li̍k, jîn-tsîng ê un-luán, koh-ū hit khuán bô tè uānn ê Tâi-oân-bī.`;
+
+  // 白話字 (POJ 500+ 字長文範例)
+  const SAMPLE_ARTICLE_POJ = `Tâi-oân chá-chhī-á ê chu-bī kap jîn-chêng-bī
+
+Thàu-chá gō͘-tiám gōa, thiⁿ iáu-bē kng, ke-á-lō͘ ê chá-chhī-á tō í-keng jia̍t-lia̍t-kún-kún. Chhài-hoàn the-chhia ji̍p-khì hāng-á-kháu, hî-hoàn kā thàu-chá tuì káng-kháu chài--lâi ê hiān-lô hî-hê chi̍t-phuân chi̍t-phuân pâi-chiâu-chiâu, téng-thâu iáu hâm-tio̍h chhuì-peng, thàu-chhut hō͘ lâng sim-liâng-pî-thàu-khui ê chhinn-tinn-bī. Bē-chhài ê oo-bá-sáng iōng i chhin-chhiat iū tōa-siaⁿ ê âu-lông hoah: "Ta̍k-ke kín lâi bé--ooh! Chit lia̍p ko-lê-chhài sī Lê-soaⁿ kng sàng--lo̍h-lâi ê, chhè koh tinn, bô bé lí ē hiō-hóe!"
+
+Oán chi̍t ê oan, kiâⁿ-ji̍p-khì bē sio-chia̍h ê jia̍t-lia̍t-khu, bah-oân-á, mī-sòaⁿ-kô͘, bí-ko ê phang-bī suî phīⁿ phiau--kuè-lâi. Hit ê bē bí-ko ê tōa-chek, siang-chhiú bô thêng--kuè, chi̍t oán sòa chi̍t oán lîm bah-sò͘, sap phang-chhài, chham ló͘-nn̄g. Chē tī înn-toh-á pinn chia̍h chá-tǹg ê a-peh, chi̍t-chhiú the̍h tī, chi̍t-chhiú hian pò-chóa, khòaⁿ-tio̍h si̍k-sāi ê keh-piah lí-tiúnn kiâⁿ--kuè, suî hoah kóng: "Lí-tiúnn, lâi--lah! Chit oán góa chhiáⁿ, chē--lo̍h-lâi chia̍h chi̍t oán sio-mī!" Chit-khoán m̄-bián kheh-khì, ti̍t-chiat-liáu-tòng ê jia̍t-chêng, sī chá-chhī-á to̍k-iú ê oa̍h-le̍k.
+
+Kiâⁿ kàu ke-bóe ê hēng-jîn-tê-tòaⁿ, chiôh-bō bō--chhut-lâi ê hēng-jîn-chiuⁿ kún kah ti̍t-ti̍t phú-ian, lāu-a-peh chiūⁿ-chhiú gia̍h tn̂g-tī, khin-khin ngeh-khí iû-chia̍h-kóe, chi̍t-chiat chi̍t-chiat chìm--lo̍h-khì kún-sio ê hēng-jîn-tê lāi-té, bî-tinn bî-khó͘, he sī kó͘-chá nî-tāi sûn-phok ê chu-bī. Siàu-liân-lâng tiám-thâu chhiò kóng: "Bô m̄-tio̍h, tō sī chit bī! Chi̍t kang nā bô chia̍h--tio̍h, kui sin-khu lóng bô-la̍t!"
+
+Chá-chhī-á m̄-nā sī bé-chhài bé-bah ê só͘-chāi, i kèng-ka sī chng-thâu lîn-lí chêng-kám kau-liû ê sim-chōng. Put-koán sī chhit, peh-cha̍p hòe ê lāu-tōa-lâng, ia̍h-sī khan-tio̍h gín-á ê hāu-seⁿ pē-bú, ta̍k-ke tī chia sio-tú, lóng ē thêng--lo̍h-lâi khai-káng saⁿ kuí kù. "Lí kin-á-ji̍t ê khuì-sek chin hó--ooh!" "Tsa-mî hit tiûⁿ hō͘ lo̍h kah chin tōa, chhân-ni̍h ê chhài m̄-chai kám ū phah-sún?" "Lín sun-á kin-nî khó tāi-ha̍k, tha̍k tó chi̍t keng ha̍k-hāu?" Ta̍k kù koan-sim lóng thàu-chhut un-loán ê jîn-chêng.
+
+Tse tō sī Tâi-oân ê chá-chhī-á, chhiong-boán thó͘-tē ê sìⁿ-miā-le̍k, jîn-chêng ê un-loán, koh-ū hit khoán bô tè ōaⁿ ê Tâi-oân-bī.`;
 
   // ========================================================================
   // 1. 初始化與主題
@@ -261,11 +289,17 @@
   function updateCharCount() {
     const text = articleInput.value.trim();
     const count = text.length;
-    charCounter.textContent = `${count} 字 ${count >= 500 ? '✅ (已達 500+ 字長文標竿)' : '(目標 ≥ 500 字)'}`;
-    if (count >= 500) {
-      charCounter.classList.add('valid-500');
+    const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
+    const isRomanText = /[a-zA-Z]/.test(text) && !/[\u4e00-\u9fa5]/.test(text);
+
+    if (isRomanText) {
+      charCounter.textContent = `${words} 詞 / ${count} 字母 ${count >= 500 || words >= 150 ? '✅ (長文標準)' : '(長文建議 ≥ 150 詞)'}`;
+      if (count >= 500 || words >= 150) charCounter.classList.add('valid-500');
+      else charCounter.classList.remove('valid-500');
     } else {
-      charCounter.classList.remove('valid-500');
+      charCounter.textContent = `${count} 字 ${count >= 500 ? '✅ (已達 500+ 字長文標竿)' : '(目標 ≥ 500 字)'}`;
+      if (count >= 500) charCounter.classList.add('valid-500');
+      else charCounter.classList.remove('valid-500');
     }
   }
 
@@ -284,6 +318,28 @@
     reAnalyzeText();
   });
 
+  if (loadTailoSampleBtn) {
+    loadTailoSampleBtn.addEventListener('click', () => {
+      articleInput.value = SAMPLE_ARTICLE_TAILO;
+      // 自動切換為教育部台羅
+      const tailoRadio = document.querySelector('input[name="romanScheme"][value="tailo"]');
+      if (tailoRadio) tailoRadio.checked = true;
+      updateCharCount();
+      reAnalyzeText();
+    });
+  }
+
+  if (loadPojSampleBtn) {
+    loadPojSampleBtn.addEventListener('click', () => {
+      articleInput.value = SAMPLE_ARTICLE_POJ;
+      // 自動切換為白話字
+      const pojRadio = document.querySelector('input[name="romanScheme"][value="poj"]');
+      if (pojRadio) pojRadio.checked = true;
+      updateCharCount();
+      reAnalyzeText();
+    });
+  }
+
   clearTextBtn.addEventListener('click', () => {
     articleInput.value = '';
     updateCharCount();
@@ -296,8 +352,8 @@
   // ========================================================================
   function splitTextToSentences(text) {
     if (!text) return [];
-    // 依句末標點與換行切分
-    const rawChunks = text.split(/([。！？!?\n\r]+)/);
+    // 依句末標點、換行或全羅英文句尾句號切分
+    const rawChunks = text.split(/([。！？!?\n\r]+|(?<=[a-zA-Z0-9\u00C0-\u024F\u0300-\u036F\u1E00-\u1EFF·͘ⁿ])\.\s+)/);
     const sentences = [];
     let current = '';
 
@@ -335,7 +391,37 @@
       let matchLen = 0;
       const upper = Math.min(maxLen, chars.length - i);
 
-      // 先查使用者自訂詞庫快取
+      // 🌟 1. 優先檢查是否為羅馬字單詞 (全羅/白話字/數字調，支援 -- 輕聲與 - 連接)
+      const remaining = chars.slice(i).join('');
+      const romanMatch = remaining.match(/^(--)?[A-Za-z\u00C0-\u024F\u0300-\u036F\u1E00-\u1EFF·͘ⁿ]+[1-9]?(?:-(?:--)?[A-Za-z\u00C0-\u024F\u0300-\u036F\u1E00-\u1EFF·͘ⁿ]+[1-9]?)*/);
+      if (romanMatch && romanMatch[0]) {
+        const wordStr = romanMatch[0];
+        const parsedSylls = typeof Romanize !== 'undefined' ? Romanize.parseWord(wordStr) : null;
+        if (parsedSylls && parsedSylls.length > 0) {
+          const key = Romanize.wordToKey(parsedSylls);
+          const hits = (typeof Dict !== 'undefined' && Dict.isLoaded()) ? Dict.lookupRom(key) : null;
+          const matchedHanzi = (hits && hits.length > 0) ? hits[0].hanzi : null;
+          const directAudio = (hits && hits.length > 0) ? Dict.resolveAudioUrl(hits[0]) : null;
+          const fallbackAudios = (typeof Dict !== 'undefined' && Dict.isLoaded()) ? Dict.findAudioForSyllables(parsedSylls) : null;
+
+          tokens.push({
+            type: 'word',
+            is_roman: true,
+            hanzi: matchedHanzi || wordStr,
+            matched_hanzi: matchedHanzi,
+            roman_input: wordStr,
+            entries: hits || [{ reading: wordStr, trs: wordStr }],
+            choice: 0,
+            audio_url: directAudio,
+            fallback_audios: Array.isArray(fallbackAudios) ? fallbackAudios : [],
+            parsedSylls: parsedSylls
+          });
+          i += Array.from(wordStr).length;
+          continue;
+        }
+      }
+
+      // 2. 查使用者自訂詞庫快取
       for (let len = upper; len >= 1; len--) {
         const candidate = chars.slice(i, i + len).join('');
         if (customOverrides.has(candidate)) {
@@ -401,6 +487,9 @@
     if (token.entries && token.entries.length > 0) {
       const entry = token.entries[token.choice || 0];
       return entry.reading || entry.trs || '';
+    }
+    if (token.is_roman) {
+      return token.tailo_base || token.roman_input || '';
     }
     return '';
   }
@@ -495,9 +584,15 @@
           const hasSandhi = sandhiToggle.checked && (displayRoman !== sandhiRoman) && (!override || !override.forceBase);
           chip.classList.add(hasSandhi ? 'sandhi' : 'base');
 
+          const isRoman = !!t.is_roman;
+          if (isRoman) chip.classList.add('roman-origin');
+          const hanziDisplay = (isRoman && t.matched_hanzi)
+            ? `<span class="token-hanzi roman-hanzi-hint">(${t.matched_hanzi})</span>`
+            : (isRoman ? `<span class="token-hanzi">${t.roman_input || t.hanzi}</span>` : `<span class="token-hanzi">${t.hanzi}</span>`);
+
           chip.innerHTML = `
             <span class="token-roman">${displayRoman || t.hanzi}</span>
-            <span class="token-hanzi">${t.hanzi}</span>
+            ${hanziDisplay}
             ${hasSandhi ? `<span class="token-sandhi-hint">變: ${sandhiRoman}</span>` : ''}
           `;
 
@@ -595,14 +690,26 @@
 
           chip.classList.add(hasSandhi ? 'sandhi' : 'base');
 
+          const isRoman = !!t.is_roman;
+          if (isRoman) chip.classList.add('roman-origin');
+          const hanziDisplay = (isRoman && t.matched_hanzi)
+            ? `<span class="token-hanzi roman-hanzi-hint">(${t.matched_hanzi})</span>`
+            : (isRoman ? `<span class="token-hanzi">${t.roman_input || t.hanzi}</span>` : `<span class="token-hanzi">${t.hanzi}</span>`);
+
           chip.innerHTML = `
             <span class="token-roman">${displayRoman || t.hanzi}</span>
-            <span class="token-hanzi">${t.hanzi}</span>
+            ${hanziDisplay}
             ${hasSandhi ? `<span class="token-sandhi-hint">變: ${sandhiRoman}</span>` : ''}
           `;
 
           chip.addEventListener('click', () => {
-            openTokenModal(t, sIdx, tIdx);
+            openTokenModal(t.is_roman ? {
+              hanzi: t.hanzi,
+              entries: [{ reading: displayRoman }],
+              audio_url: t.audio_url,
+              override: t.override,
+              choice: 0
+            } : t, sIdx, tIdx);
           });
 
           tokenBox.appendChild(chip);
@@ -1233,6 +1340,16 @@
     if (t.audio_url) return { url: t.audio_url, parts: [] };
     if (t.fallback_audios && t.fallback_audios.length) return { url: null, parts: t.fallback_audios };
     if (!hasDict) return { url: null, parts: [] };
+
+    // 2.5 羅馬字直接輸入：依音節借音
+    if (t.is_roman) {
+      const sylls = t.parsedSylls || (typeof Romanize !== 'undefined' ? Romanize.parseWord(t.tailo_base || t.roman_input) : null);
+      if (sylls && sylls.length) {
+        const found = Dict.findAudioForSyllables(sylls);
+        if (Array.isArray(found)) return { url: null, parts: found };
+        if (found) return { url: found, parts: [] };
+      }
+    }
 
     // 3. 前端辭典整詞音檔
     if (t.entries && t.entries.length) {
