@@ -1,11 +1,17 @@
 # Taigi TTS Studio (台語多模型長文語音合成工坊)
 
+[![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-Live%20Demo-brightgreen.svg?logo=github)](https://sinliongtoo.github.io/taigi-tts-studio/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-brightgreen.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-teal.svg)](https://fastapi.tiangolo.com)
 [![Meta MMS](https://img.shields.io/badge/Meta%20MMS-facebook%2Fmms--tts--nan-orange.svg)](https://huggingface.co/facebook/mms-tts-nan)
+[![Opus Codec](https://img.shields.io/badge/Audio%20Codec-Opus%20Verified-blueviolet.svg)](samples/mms_article_taigi.opus)
 
 一套專為**臺灣話（台語 / 閩南語 / Tâi-gí）**量身打造的高品質、長文朗讀、多模型語音合成與連讀變調調校系統。
+
+🌐 **線上免安裝體驗 (GitHub Pages)**：  
+👉 **[https://sinliongtoo.github.io/taigi-tts-studio/](https://sinliongtoo.github.io/taigi-tts-studio/)**  
+*(免裝 Python，瀏覽器直接開箱使用教育部 14,000+ 詞真人發音、500+ 字長文朗讀、動態伴讀高亮與聲調微調盤)*
 
 本專案承襲並大幅進化自先前開發之 [sinliongtoo/taigi-tts](https://sinliongtoo.github.io/taigi-tts/)，全面解決長篇文本（**500 字以上**）朗讀中斷、模型單一、以及台語特有「**連讀變調（Tone Sandhi）**」所造成的語調生硬機械感等核心痛點。
 
@@ -75,10 +81,13 @@ TIGI_TTS_MOREMODL/
 ├── edge_engine.py                 # Microsoft Edge-TTS 長文串流拼接引擎
 ├── mms_engine.py                  # Meta MMS-TTS (facebook/mms-tts-nan) 推論引擎
 ├── test_system.py                 # 自動化單元測試腳本 (涵蓋變調、長文、API)
+├── verify_voice.py                # 台語語音合成驗證工具 (CPS、RMS、削波與音訊品質審計)
 ├── samples/
 │   ├── sample_article_500words.txt # 662 字經典長文範例 (台灣早市仔)
 │   ├── edge_test.mp3              # Edge-TTS 測試音檔
-│   └── article_662words_hsiaochen.mp3 # 662 字長文合成完整示範音檔 (~2.5 分鐘)
+│   ├── article_662words_hsiaochen.mp3 # 662 字長文合成完整示範音檔 (~2.5 分鐘)
+│   ├── mms_article_taigi.wav      # Meta MMS-TTS 662 字無損變調朗讀音檔 (5.8 MB)
+│   └── mms_article_taigi.opus     # Opus 極速串流高壓縮驗證音檔 (625 KB，省流 89%)
 └── web/
     ├── index.html                 # 現代化專業 Taigi TTS Studio 介面
     ├── style.css                  # 精緻響應式排版 (支援明亮/深色主題)
@@ -151,6 +160,9 @@ python cli.py --list-models
 ```bash
 # 驗證合成音訊的聲學健康度、削波失真與長文完整度 (CPS 字率)
 python verify_voice.py --audio samples/mms_article_taigi.wav --text samples/sample_article_500words.txt
+
+# 亦支援最新低延遲 Opus 音訊驗證 (100 分滿分通過，檔案節省 89% 體積)
+python verify_voice.py --audio samples/mms_article_taigi.opus --text samples/sample_article_500words.txt
 ```
 
 檢驗指標包含：
