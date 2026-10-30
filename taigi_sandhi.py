@@ -350,6 +350,32 @@ class TaigiTextPipeline:
 
         return "".join(out_tokens)
 
+    def convert_to_poj_raw(self, text: str) -> str:
+        """
+        將輸入轉換為【標準 POJ 白話字符號調】(維持指定調號，不套用連讀變調)。
+        可處理漢字、台羅符號調或台羅數字調（例如 tsiah2-png7 -> chiáh-pn̄g），
+        確保送入 Meta MMS 的字串永遠具備合法的 POJ 調號符號。
+        """
+        raw_roman = self.g2p_raw(text, system='Tailo')
+        tokens = re.split(r'(\s+|[，。！？；、：“”「」『』,.!?;:\n\r\t]+)', raw_roman)
+        out_tokens = []
+
+        for tok in tokens:
+            if not tok or re.match(r'^(\s+|[，。！？；、：“”「」『』,.!?;:\n\r\t]+)$', tok):
+                out_tokens.append(tok)
+                continue
+
+            sub_parts = tok.split('-')
+            parsed_sylls = [parse_syllable(p) for p in sub_parts]
+
+            if all(s is not None for s in parsed_sylls) and parsed_sylls:
+                poj_words = [skeleton_to_poj(s.skeleton, s.tone) for s in parsed_sylls]
+                out_tokens.append("-".join(poj_words))
+            else:
+                out_tokens.append(tok)
+
+        return "".join(out_tokens)
+
     def parse_sentence_to_tokens(self, sentence: str) -> List[Dict[str, Any]]:
         """
         將單一句子解析為詳細的詞塊 (Tokens) 清單：

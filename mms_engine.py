@@ -73,7 +73,7 @@ class MmsTtsEngine:
         if apply_sandhi:
             poj_text = self.g2p.convert_to_sandhi_poj(sentence_text)
         else:
-            poj_text = self.g2p.g2p_raw(sentence_text, system="POJ")
+            poj_text = self.g2p.convert_to_poj_raw(sentence_text)
 
         cleaned_poj = self.clean_poj_for_mms(poj_text)
         if not cleaned_poj:
@@ -118,7 +118,7 @@ class MmsTtsEngine:
             if apply_sandhi:
                 poj_converted = self.g2p.convert_to_sandhi_poj(raw_text)
             else:
-                poj_converted = self.g2p.g2p_raw(raw_text, system="POJ")
+                poj_converted = self.g2p.convert_to_poj_raw(raw_text)
 
             sentence_poj_list.append({
                 "index": item["index"],

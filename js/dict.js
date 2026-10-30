@@ -443,6 +443,25 @@ const Dict = (() => {
 
   // ---------- 對外 API ----------
 
+  function buildIndexFromMoeIndex(moeObj) {
+    const wordIndex = new Map();
+    const romIndex = new Map();
+    let maxWordLen = 1;
+    for (const [title, info] of Object.entries(moeObj)) {
+      if (!title || !info || !info.trs) continue;
+      maxWordLen = Math.max(maxWordLen, Array.from(title).length);
+      const entry = { trs: info.trs.trim(), reading: '', id: info.id || '', audioUrl: null, custom: false };
+      wordIndex.set(title, [entry]);
+      const parsed = Romanize.parseWord(info.trs);
+      if (parsed) {
+        const key = Romanize.wordToKey(parsed);
+        if (!romIndex.has(key)) romIndex.set(key, []);
+        romIndex.get(key).push({ hanzi: title, trs: info.trs, reading: '', id: info.id, audioUrl: null, custom: false });
+      }
+    }
+    return { wordIndex, romIndex, maxWordLen };
+  }
+
   async function load({ onProgress, forceRefresh } = {}) {
     let fromCache = true;
     if (forceRefresh) {
@@ -456,11 +475,31 @@ const Dict = (() => {
       if (cached) {
         state = { ...deserialize(cached), loaded: true };
       } else {
-        fromCache = false;
-        const raw = await fetchRaw(onProgress);
-        const idx = buildIndex(raw);
-        state = { ...idx, loaded: true };
-        writeCache(serialize(idx));
+        // ⚡ 優先極速嘗試同網域/本地打包的 moe_audio_index.json (744KB, 毫秒級生效)
+        let fastLoaded = false;
+        try {
+          const fastRes = await fetch('js/moe_audio_index.json');
+          if (fastRes.ok) {
+            const fastData = await fastRes.json();
+            const fastIdx = buildIndexFromMoeIndex(fastData);
+            state = { ...fastIdx, loaded: true };
+            fastLoaded = true;
+          }
+        } catch (e) {
+          console.warn('Fast index loading skipped:', e);
+        }
+
+        // 接續或背景下載官方完整大型辭典 (寫入 IndexedDB 快取)
+        try {
+          const raw = await fetchRaw(onProgress);
+          const idx = buildIndex(raw);
+          state = { ...idx, loaded: true };
+          writeCache(serialize(idx));
+          fromCache = false;
+        } catch (err) {
+          if (!fastLoaded) throw err;
+          console.info('已使用本機打包之 moe_audio_index.json 提供完整離線詞庫與真人發音。');
+        }
       }
     }
 
@@ -496,9 +535,32 @@ const Dict = (() => {
     return audioUrl(entry.id);
   }
 
+  // 根據音節序列借用同音字音檔 (支援使用者自訂聲調發音試聽)
+  function findAudioForSyllables(sylls) {
+    if (!sylls || !sylls.length) return null;
+    const key = Romanize.wordToKey(sylls);
+    const exact = lookupRom(key);
+    if (exact && exact.length) {
+      const hit = exact.find(m => resolveAudioUrl(m));
+      if (hit) return resolveAudioUrl(hit);
+    }
+    // 逐音節借用
+    const perSyll = sylls.map(s => {
+      const k = Romanize.wordToKey([s]);
+      const matches = lookupRom(k);
+      const h = matches && matches.find(m => resolveAudioUrl(m));
+      return h ? resolveAudioUrl(h) : null;
+    });
+    if (perSyll.every(Boolean)) return perSyll;
+    return null;
+  }
+
   return {
-    load, lookupWord, lookupRom, getMaxWordLen, isLoaded, audioUrl, resolveAudioUrl,
+    load,
+    init: load, // 兼容 init() 呼叫
+    lookupWord, lookupRom, getMaxWordLen, isLoaded, audioUrl, resolveAudioUrl, findAudioForSyllables,
     importCustom, clearCustom, customCount, addCustomEntry,
+    saveCustomEntry: async (hanzi, trs, note = '自訂', audio = '') => addCustomEntry({ hanzi, trs, note, audio }),
     getCustomEntries, removeCustomEntry, exportCustomWithAudio, findCustomAudio,
     importAudioFiles, clearAudio, audioCount
   };
