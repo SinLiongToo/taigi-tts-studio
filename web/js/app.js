@@ -29,6 +29,8 @@
 
   const articleInput = el('articleInput');
   const charCounter = el('charCounter');
+  const sampleSelect = el('sampleSelect');
+  const loadChosenSampleBtn = el('loadChosenSampleBtn');
   const loadSampleBtn = el('loadSampleBtn');
   const loadTailoSampleBtn = el('loadTailoSampleBtn');
   const loadPojSampleBtn = el('loadPojSampleBtn');
@@ -98,8 +100,8 @@
   let pendingAudioResolve = null; // 目前正在等待播完的音檔 Promise，停止時直接放行避免卡住
   const sentenceBlobCache = new Map(); // MMS/Edge 逐句音檔預先合成快取 (邊播邊算下一句)
 
-  // 500+ 字台語精采範文 (662 字)
-  const SAMPLE_ARTICLE = `台灣早市仔的滋味佮人情味
+  // 1. 漢字長文範例 (662 字 - 台灣早市仔)
+  const SAMPLE_ARTICLE_HANZI = `台灣早市仔的滋味佮人情味
 
 透早五點外，天猶未光，街仔路的早市仔就已經熱鬧滾滾。菜販推車入去巷仔口，魚販共透早對港口載來的現撈魚蝦一盤一盤排齊齊，頂頭猶含著碎冰，透出令儂心涼脾透開的鮮甜味。賣菜的歐巴桑用伊親切又大聲的喉嚨喝：「逐家緊來買喔！這粒高麗菜是梨山剛送下來的，脆閣甜，無買你會後悔！」
 
@@ -111,7 +113,29 @@
 
 行出市場，天已經大光，日頭金熾熾照佇滿載而歸的菜籃仔內。手中提著滿滿的菜蔬魚肉，心內嘛裝滿了溫暖。這个充滿活力的市仔，陪伴著逐一代台灣儂過日子，將土地的滋味佮人心的溫度，一代接一代傳承落去。`;
 
-  // 全羅 (教育部台羅 Tâi-lô 500+ 字長文範例)
+  // 2. 現代漢羅混寫範例 (Han-Lô Mixed 600+ 字，兼具漢字美感與精準拼音)
+  const SAMPLE_ARTICLE_HANLO = `台灣早市仔 ê 滋味佮人情味
+
+透早五點外，天 iáu-bē kng，街仔路 ê 早市仔 tiō 已經熱鬧滾滾。菜販 the-tshia 入去巷仔口，魚販 kā 透早 tuì 港口載來 ê 現撈魚蝦 chi̍t-puânn chi̍t-puânn 排齊齊，頂頭 iáu 含著碎冰，透出令儂 sim-liâng-pî-thàu-khui ê 鮮甜味。賣菜 ê oo-bá-sáng 用伊親切 iū 大聲 ê 喉嚨 huah：「逐家 kín 來買--ooh！Tsit lia̍p 高麗菜 sī 梨山剛送落來 ê，tshè koh 甜，無買你會後悔！」
+
+轉個彎，行入去賣熟食 ê 熱鬧區，肉圓仔、麵線糊、米糕 ê 香味 suî 鼻 phiau--kuè-lâi。Hit-ê 賣米糕 ê 大叔，雙手無停過，chi̍t-uán suà chi̍t-uán 淋肉燥、sap 香菜、tsham 滷蛋。坐 tī 圓桌仔邊食早餐 ê 阿伯，chi̍t-tshiú 提箸，chi̍t-tshiú 掀報紙，看著熟識 ê 隔壁里長行過，suî huah 講：「里長，來--lah！Tsit uán 我請，坐落來食 chi̍t-uán 溫暖 ê 熱麵！」Tsit-khuán m̄-bián 客氣、直截了當 ê 熱情，sī 早市仔獨有 ê 活力。
+
+行到街尾 ê 杏仁茶攤，石磨磨出來 ê 杏仁漿滾得直直冒煙，老阿伯右手攑長筷，輕輕 ngeh-khí 油炸粿，chi̍t-tsiat chi̍t-tsiat tsim--lo̍h-khì 滾熱 ê 杏仁茶內底，微甜微苦，he sī 古早年代純樸 ê 滋味。少年人點頭笑講：「Bô m̄-tio̍h，tiō sī tsit bī！Chi̍t kang 若無食著，kui sin-khu 攏無力！」
+
+早市仔 m̄-nā sī 買菜買肉 ê 所在，伊更加 sī 庄頭鄰里情感交流 ê 心臟。不管是七、八十歲 ê 老大人，抑是牽著囡仔 ê 後生爸母，逐家 tī tsia 相拄，攏會停落來開講三幾句。「你今仔日 ê 氣色真好--ooh！」「昨暝 hit tiûnn 雨落甲真大，田裡 ê 菜 m̄-tsai 敢有拍損？」「Lín 孫仔今年考大學，tha̍k 佗 chi̍t-king 學校？」逐句關心攏透出溫暖 ê 人情。
+
+Tse tiō-sī 台灣 ê 早市仔，充滿土地 ê 生命力、人情 ê 溫暖，koh-ū hit-khuán 無底代換 ê 台灣味。`;
+
+  // 3. 經典白話字範文 (POJ 傳統教會報散文體 - 《Pe̍h-ōe-jī ê Khí-thâu kap Tâi-oân Kò͘-sū》)
+  const SAMPLE_ARTICLE_POJ_CLASSIC = `Pe̍h-ōe-jī ê Khí-thâu kap Tâi-oân Kò͘-sū
+
+Tâi-oân ê Pe̍h-ōe-jī (POJ), tùi chi̍t-pah-gōa-nî chêng tiō í-keng tī chit tè thó͘-tē chhim-chhim chhah-kin. 1885 nî, Pa-khek-lé (Thomas Barclay) bo̍k-su tī Tâi-lâm chhut-pán liáu choân Tâi-oân tē-it hūn pò-chóa —《Tâi-oân Hú-siâⁿ Kàu-hōe-pò》. Hit-chūn ê Tâi-oân lâng, chē-chē lâng bô kòe-hūn ê ki-hōe thak Hàn-jī, m̄-koh thàu-kòe chit thò lēng-lūi ê Lô-má-jī, bô-lūn sī a-peh, a-mó͘, iah-sī bē chhài ê tiàm-chú, lóng ē-tàng tī chi̍t-nn̄g kò-goe̍h lāi-bīn ha̍k-hōe tha̍k kap siá.
+
+Tsit thò jī-bú chiong Tâi-gí ê siaⁿ-tiāu piáu-sī kah chin chheng-chhó. Im-piâⁿ, Im-sióng, Im-khì, Im-ji̍p; Iông-piâⁿ, Iông-khì, Iông-ji̍p, lóng-chóng chhit-ê siaⁿ-tiāu kap piàn-tiāu kui-chek, lóng ē-tàng iōng hû-hō piáu-ta̍t chhut-lâi. Chhài-chhī-á ê siaⁿ-chàu, thiⁿ-téng ê kng-iáⁿ, hām chng-thâu lāu-tōa-lâng ê kóng-ōe, lóng ē-tàng thàu-kòe chhiu-chhiu-chha-chha ê Lô-má-jī kì-lo̍k--lo̍h-lâi.
+
+Chit-má ê sin kho-ki, hō͘ lán kèng-ka ē-tàng lī-iōng tiān-náu kap sîn-keng bāng-lō͘ (neural network), kā Pe̍h-ōe-jī piàn-sêng chū-jiân ê siaⁿ-im. Lán bô su-iàu koh iú-hān tī gí-giân ê kài-hān, kan-na thiau chi̍t-ê tiám-phìⁿ, tiō ē-tàng thiaⁿ-tio̍h kò͘-hiong ê siaⁿ. Che m̄-nā sī bûn-hòa ê thoân-sêng, kèng-ka sī lán tùi chit tè thó͘-tē chhim-chhim ê jia̍t-chêng kap kám-chêng.`;
+
+  // 4. 全羅 (教育部台羅 Tâi-lô 500+ 字長文範例)
   const SAMPLE_ARTICLE_TAILO = `Tâi-oân chá-tshī-á ê tsu-bī kap jîn-tsîng-bī
 
 Thàu-tsá gōo-tiám guā, thinn iáu-bē kng, ke-á-lōo ê chá-tshī-á tō í-king jia̍t-liat-kún-kún. Tshài-huàn the-tshia ji̍p-khì hāng-á-kháu, hî-huàn kā thàu-tsá tuì káng-kháu tsài--lâi ê hiān-lô hî-hê tsi̍t-puânn tsi̍t-puânn pâi-tsiâu-tsiâu, tíng-thâu iáu hâm-tio̍h tshuì-ping, thàu-tshut hōo lâng sim-liâng-pî-thàu-khui ê tshinn-tinn-bī. Bē-tshài ê oo-bá-sáng iōng i tshin-tshiat iū tuā-siann ê âu-lông huah: "Ta̍k-ke kín lâi bé--ooh! Tsit lia̍p ko-lê-tshài sī Lê-suann kng sàng--lo̍h-lâi ê, tshè koh tinn, bô bé lí ē hiō-hué!"
@@ -124,18 +148,18 @@ Chá-tshī-á m̄-nā sī bé-tshài bé-bah ê sóo-tsāi, i kìng-ka sī tsng-
 
 Tse tō sī Tâi-oân ê chá-tshī-á, tshiong-buán thóo-tē ê sìnn-miā-li̍k, jîn-tsîng ê un-luán, koh-ū hit khuán bô tè uānn ê Tâi-oân-bī.`;
 
-  // 白話字 (POJ 500+ 字長文範例)
-  const SAMPLE_ARTICLE_POJ = `Tâi-oân chá-chhī-á ê chu-bī kap jîn-chêng-bī
+  // 5. 數字調輸入示範 (Numeric Romanization 鍵盤盲打體驗)
+  const SAMPLE_ARTICLE_NUMERIC = `Tai5-uan5 tsa2-tshi7-a2 e5 tsu1-bi7 kap4 jin5-tsing5-bi7
 
-Thàu-chá gō͘-tiám gōa, thiⁿ iáu-bē kng, ke-á-lō͘ ê chá-chhī-á tō í-keng jia̍t-lia̍t-kún-kún. Chhài-hoàn the-chhia ji̍p-khì hāng-á-kháu, hî-hoàn kā thàu-chá tuì káng-kháu chài--lâi ê hiān-lô hî-hê chi̍t-phuân chi̍t-phuân pâi-chiâu-chiâu, téng-thâu iáu hâm-tio̍h chhuì-peng, thàu-chhut hō͘ lâng sim-liâng-pî-thàu-khui ê chhinn-tinn-bī. Bē-chhài ê oo-bá-sáng iōng i chhin-chhiat iū tōa-siaⁿ ê âu-lông hoah: "Ta̍k-ke kín lâi bé--ooh! Chit lia̍p ko-lê-chhài sī Lê-soaⁿ kng sàng--lo̍h-lâi ê, chhè koh tinn, bô bé lí ē hiō-hóe!"
+Thau3-tsa2 goo7-tiam2 gua7, thinn1 iau2-be7 kng1, ke1-a2-loo7 e5 tsa2-tshi7-a2 to7 i2-king1 jiat8-liat8-kun2-kun2. Tshai3-huan3 the1-tshia1 jip8-khi3 hang7-a2-khau2, hi5-huan3 ka7 thau3-tsa2 tui3 kang2-khau2 tsai3--lai5 e5 hian7-lo5 hi5-he5 tsit8-puann5 tsit8-puann5 pai5-tsiau5-tsiau5, ting2-thau5 iau2 ham5-tioh8 tshui3-ping1, thau3-tshut4 hoo7 lang5 sim1-liang5-pi5-thau3-khui1 e5 tshinn1-tinn1-bi7.
 
-Oán chi̍t ê oan, kiâⁿ-ji̍p-khì bē sio-chia̍h ê jia̍t-lia̍t-khu, bah-oân-á, mī-sòaⁿ-kô͘, bí-ko ê phang-bī suî phīⁿ phiau--kuè-lâi. Hit ê bē bí-ko ê tōa-chek, siang-chhiú bô thêng--kuè, chi̍t oán sòa chi̍t oán lîm bah-sò͘, sap phang-chhài, chham ló͘-nn̄g. Chē tī înn-toh-á pinn chia̍h chá-tǹg ê a-peh, chi̍t-chhiú the̍h tī, chi̍t-chhiú hian pò-chóa, khòaⁿ-tio̍h si̍k-sāi ê keh-piah lí-tiúnn kiâⁿ--kuè, suî hoah kóng: "Lí-tiúnn, lâi--lah! Chit oán góa chhiáⁿ, chē--lo̍h-lâi chia̍h chi̍t oán sio-mī!" Chit-khoán m̄-bián kheh-khì, ti̍t-chiat-liáu-tòng ê jia̍t-chêng, sī chá-chhī-á to̍k-iú ê oa̍h-le̍k.
+Be7-tshai3 e5 oo1-ba2-sang2 iong3 i1 tshin1-tshiat4 iu3 tua7-siann1 e5 au5-long5 huah4: "Tak8-ke1 kin2 lai5 be2--ooh! Tsit4 liap8 ko1-le5-tshai3 si7 Le5-suann1 kng1 sang3--loh8-lai5 e5, tshe3 koh4 tinn1, bo5 be2 li2 e7 hio7-hue2!"
 
-Kiâⁿ kàu ke-bóe ê hēng-jîn-tê-tòaⁿ, chiôh-bō bō--chhut-lâi ê hēng-jîn-chiuⁿ kún kah ti̍t-ti̍t phú-ian, lāu-a-peh chiūⁿ-chhiú gia̍h tn̂g-tī, khin-khin ngeh-khí iû-chia̍h-kóe, chi̍t-chiat chi̍t-chiat chìm--lo̍h-khì kún-sio ê hēng-jîn-tê lāi-té, bî-tinn bî-khó͘, he sī kó͘-chá nî-tāi sûn-phok ê chu-bī. Siàu-liân-lâng tiám-thâu chhiò kóng: "Bô m̄-tio̍h, tō sī chit bī! Chi̍t kang nā bô chia̍h--tio̍h, kui sin-khu lóng bô-la̍t!"
+Tse1 to7 si7 Tai5-uan5 e5 tsa2-tshi7-a2, tshiong1-buan2 thoo2-te7 e5 sinn3-mia7-lik8, jin5-tsing5 e5 un1-luan2, koh4-u7 hit4 khuan2 bo5 te3 uann7 e5 Tai5-uan5-bi7.`;
 
-Chá-chhī-á m̄-nā sī bé-chhài bé-bah ê só͘-chāi, i kèng-ka sī chng-thâu lîn-lí chêng-kám kau-liû ê sim-chōng. Put-koán sī chhit, peh-cha̍p hòe ê lāu-tōa-lâng, ia̍h-sī khan-tio̍h gín-á ê hāu-seⁿ pē-bú, ta̍k-ke tī chia sio-tú, lóng ē thêng--lo̍h-lâi khai-káng saⁿ kuí kù. "Lí kin-á-ji̍t ê khuì-sek chin hó--ooh!" "Tsa-mî hit tiûⁿ hō͘ lo̍h kah chin tōa, chhân-ni̍h ê chhài m̄-chai kám ū phah-sún?" "Lín sun-á kin-nî khó tāi-ha̍k, tha̍k tó chi̍t keng ha̍k-hāu?" Ta̍k kù koan-sim lóng thàu-chhut un-loán ê jîn-chêng.
-
-Tse tō sī Tâi-oân ê chá-chhī-á, chhiong-boán thó͘-tē ê sìⁿ-miā-le̍k, jîn-chêng ê un-loán, koh-ū hit khoán bô tè ōaⁿ ê Tâi-oân-bī.`;
+  // 兼容別名
+  const SAMPLE_ARTICLE = SAMPLE_ARTICLE_HANZI;
+  const SAMPLE_ARTICLE_POJ = SAMPLE_ARTICLE_POJ_CLASSIC;
 
   // ========================================================================
   // 1. 初始化與主題
@@ -312,32 +336,52 @@ Tse tō sī Tâi-oân ê chá-chhī-á, chhiong-boán thó͘-tē ê sìⁿ-miā-
     }, 300);
   });
 
-  loadSampleBtn.addEventListener('click', () => {
-    articleInput.value = SAMPLE_ARTICLE;
-    updateCharCount();
-    reAnalyzeText();
-  });
-
-  if (loadTailoSampleBtn) {
-    loadTailoSampleBtn.addEventListener('click', () => {
-      articleInput.value = SAMPLE_ARTICLE_TAILO;
-      // 自動切換為教育部台羅
+  function loadMockSample(key) {
+    let text = SAMPLE_ARTICLE_HANZI;
+    if (key === 'hanlo') {
+      text = SAMPLE_ARTICLE_HANLO;
+    } else if (key === 'poj_classic' || key === 'poj') {
+      text = SAMPLE_ARTICLE_POJ_CLASSIC;
+      const pojRadio = document.querySelector('input[name="romanScheme"][value="poj"]');
+      if (pojRadio) pojRadio.checked = true;
+    } else if (key === 'tailo_full' || key === 'tailo') {
+      text = SAMPLE_ARTICLE_TAILO;
       const tailoRadio = document.querySelector('input[name="romanScheme"][value="tailo"]');
       if (tailoRadio) tailoRadio.checked = true;
-      updateCharCount();
-      reAnalyzeText();
+    } else if (key === 'numeric') {
+      text = SAMPLE_ARTICLE_NUMERIC;
+    } else {
+      text = SAMPLE_ARTICLE_HANZI;
+    }
+
+    articleInput.value = text;
+    updateCharCount();
+    reAnalyzeText();
+  }
+
+  if (loadChosenSampleBtn) {
+    loadChosenSampleBtn.addEventListener('click', () => {
+      const selectedKey = sampleSelect ? sampleSelect.value : 'hanzi';
+      loadMockSample(selectedKey);
     });
   }
 
-  if (loadPojSampleBtn) {
-    loadPojSampleBtn.addEventListener('click', () => {
-      articleInput.value = SAMPLE_ARTICLE_POJ;
-      // 自動切換為白話字
-      const pojRadio = document.querySelector('input[name="romanScheme"][value="poj"]');
-      if (pojRadio) pojRadio.checked = true;
-      updateCharCount();
-      reAnalyzeText();
+  if (sampleSelect) {
+    sampleSelect.addEventListener('change', () => {
+      loadMockSample(sampleSelect.value);
     });
+  }
+
+  if (loadSampleBtn) {
+    loadSampleBtn.addEventListener('click', () => loadMockSample('hanzi'));
+  }
+
+  if (loadTailoSampleBtn) {
+    loadTailoSampleBtn.addEventListener('click', () => loadMockSample('tailo_full'));
+  }
+
+  if (loadPojSampleBtn) {
+    loadPojSampleBtn.addEventListener('click', () => loadMockSample('poj_classic'));
   }
 
   clearTextBtn.addEventListener('click', () => {
@@ -1578,7 +1622,11 @@ Tse tō sī Tâi-oân ê chá-chhī-á, chhiong-boán thó͘-tē ê sìⁿ-miā-
     }
 
     // 預設載入範文
-    loadSampleBtn.click();
+    if (loadChosenSampleBtn) {
+      loadChosenSampleBtn.click();
+    } else if (loadSampleBtn) {
+      loadSampleBtn.click();
+    }
   }
 
   init();

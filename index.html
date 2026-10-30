@@ -110,15 +110,16 @@
           <span class="char-counter" id="charCounter">0 字 (目標 ≥ 500 字)</span>
         </div>
         <div class="header-actions">
-          <div class="sample-btn-group">
-            <button id="loadSampleBtn" class="btn btn-outline btn-sm" title="載入 662 字經典台語漢字範文">
-              📋 漢字範文
-            </button>
-            <button id="loadTailoSampleBtn" class="btn btn-outline btn-sm" title="載入教育部台羅 (Tâi-lô) 全羅 500+ 字長文範例">
-              🔤 全羅 (Tâi-lô)
-            </button>
-            <button id="loadPojSampleBtn" class="btn btn-outline btn-sm" title="載入白話字 (POJ) 全羅 500+ 字長文範例">
-              🔤 白話字 (POJ)
+          <div class="sample-picker-wrap">
+            <select id="sampleSelect" class="select-sm" title="選擇各類台語文體體驗範文">
+              <option value="hanzi">📋 漢字長文 (662字 台灣早市仔)</option>
+              <option value="hanlo">🔀 現代漢羅混寫 (600字 兼具漢字與拼音)</option>
+              <option value="poj_classic">📖 經典白話字 (POJ 教會報歷史散文)</option>
+              <option value="tailo_full">🔤 教育部台羅全羅 (Tâi-lô 500+詞)</option>
+              <option value="numeric">🔢 數字調輸入示範 (Numeric 鍵盤盲打)</option>
+            </select>
+            <button id="loadChosenSampleBtn" class="btn btn-outline btn-sm" title="載入所選範文進行試聽與分析">
+              載入範文
             </button>
           </div>
           <button id="clearTextBtn" class="btn btn-ghost btn-sm">清空</button>
