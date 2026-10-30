@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Taigi TTS Studio - 台語多模型長文語音合成系統</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- 頁首頂欄 -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="logo-badge">TÂI-GÍ</div>
+      <div>
+        <h1 class="app-title">Taigi TTS Studio <span class="app-sub">台語多模型語音工坊</span></h1>
+        <p class="app-desc">支援 500+ 字長文朗讀 ‧ 多模型自由選擇 ‧ 連讀變調 Pipeline ‧ 互動式發音校正</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <div id="backendBadge" class="backend-badge offline" title="後端伺服器連線狀態">
+        <span class="dot"></span>
+        <span id="backendStatusText">檢測中...</span>
+      </div>
+      <button id="themeToggle" class="btn-icon" title="切換色彩主題">🌙 深色</button>
+      <button id="helpBtn" class="btn-icon" title="說明與參考資料">❓ 說明</button>
+    </div>
+  </header>
+
+  <main class="main-container">
+    <!-- 模型與合成參數設定區 -->
+    <section class="card config-card">
+      <div class="card-header">
+        <span class="step-num">1</span>
+        <h2>語音模型與發音參數</h2>
+        <span class="badge" id="activeModelTag">教育部辭典 (正港台語真人錄音)</span>
+      </div>
+
+      <div class="config-grid">
+        <!-- 模型選擇 -->
+        <div class="form-group">
+          <label for="modelSelect">語音模型架構</label>
+          <select id="modelSelect">
+            <option value="moe_concat" selected>🏛️ 教育部臺灣台語辭典 (正港台語真人錄音，零延遲推薦)</option>
+            <option value="mms">🔬 Meta MMS-TTS (正港台語 VITS 類神經模型 + 連讀變調)</option>
+            <option value="edge">🎙️ Microsoft Edge-TTS (臺灣腔國語/華語混讀)</option>
+            <option value="web_speech">🌐 瀏覽器本機語音 (Web Speech API)</option>
+          </select>
+          <small id="modelHint" class="field-hint">播放教育部辭典官方錄音檔，逐詞拼接，正港真人台語原聲，零等待秒出聲！</small>
+        </div>
+
+        <!-- 音色講者 -->
+        <div class="form-group" id="voiceGroup">
+          <label for="voiceSelect">說話人音色</label>
+          <select id="voiceSelect">
+            <option value="HsiaoChen" selected>曉臻 (HsiaoChen - 自然柔和女聲)</option>
+            <option value="YunJhe">雲哲 (YunJhe - 穩重知性男聲)</option>
+            <option value="HsiaoYu">曉雨 (HsiaoYu - 清脆活力女聲)</option>
+          </select>
+        </div>
+
+        <!-- 變調開關 -->
+        <div class="form-group">
+          <label for="sandhiToggle">台語連讀變調規則</label>
+          <div class="toggle-wrap">
+            <input type="checkbox" id="sandhiToggle" checked />
+            <label for="sandhiToggle" class="toggle-slider"></label>
+            <span id="sandhiText">開啟 (套用五調循環與入聲變調)</span>
+          </div>
+          <small class="field-hint">MMS-TTS 必開！消除無變調之機械僵硬感。</small>
+        </div>
+
+        <!-- 拼音書寫系統 -->
+        <div class="form-group">
+          <label>羅馬字顯示偏好</label>
+          <div class="radio-inline">
+            <label><input type="radio" name="romanScheme" value="tailo" checked> 教育部台羅</label>
+            <label><input type="radio" name="romanScheme" value="poj"> 白話字 (POJ)</label>
+          </div>
+        </div>
+
+        <!-- 語速調整 -->
+        <div class="form-group range-group">
+          <div class="range-header">
+            <label for="speedRange">朗讀速度</label>
+            <span id="speedValue">1.0x</span>
+          </div>
+          <input type="range" id="speedRange" min="0.5" max="1.5" step="0.05" value="1.0" />
+        </div>
+
+        <!-- 斷句停頓時間 -->
+        <div class="form-group range-group">
+          <div class="range-header">
+            <label for="pauseRange">句間停頓緩衝</label>
+            <span id="pauseValue">300 ms</span>
+          </div>
+          <input type="range" id="pauseRange" min="100" max="800" step="50" value="300" />
+        </div>
+      </div>
+    </section>
+
+    <!-- 文章輸入與長文操作區 -->
+    <section class="card editor-card">
+      <div class="card-header space-between">
+        <div class="title-with-step">
+          <span class="step-num">2</span>
+          <h2>台語長文編輯區</h2>
+          <span class="char-counter" id="charCounter">0 字 (目標 ≥ 500 字)</span>
+        </div>
+        <div class="header-actions">
+          <button id="loadSampleBtn" class="btn btn-outline" title="快速載入 600+ 字台語精采長文進行合成測試">
+            📋 載入 500+ 字範文 (台灣早市仔)
+          </button>
+          <button id="clearTextBtn" class="btn btn-ghost">清空</button>
+        </div>
+      </div>
+
+      <div class="textarea-wrap">
+        <textarea id="articleInput" placeholder="請在此輸入欲朗讀的台語文章（漢字、漢羅或台羅皆可）... 支援 500 字以上長篇連續朗讀！"></textarea>
+      </div>
+
+      <!-- 控制列與播放進度 -->
+      <div class="player-controls">
+        <div class="btn-group">
+          <button id="playBtn" class="btn btn-primary">
+            <span class="icon">▶</span> 播放全文語音
+          </button>
+          <button id="pauseBtn" class="btn btn-secondary" disabled>
+            <span class="icon">⏸</span> 暫停
+          </button>
+          <button id="stopBtn" class="btn btn-secondary" disabled>
+            <span class="icon">⏹</span> 停止
+          </button>
+          <button id="downloadBtn" class="btn btn-accent" title="將整篇長文合成並下載完整音訊檔">
+            <span class="icon">💾</span> 匯出完整音檔 (MP3/WAV)
+          </button>
+        </div>
+
+        <div class="player-status" id="playerStatus">準備就緒</div>
+      </div>
+
+      <!-- 播放進度條 (長文跟隨) -->
+      <div class="progress-container" id="progressContainer">
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="progressBarFill"></div>
+        </div>
+        <div class="progress-labels">
+          <span id="currentTimeLabel">00:00</span>
+          <span id="currentSentenceLabel">未播放</span>
+          <span id="totalTimeLabel">00:00</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 句子切分與發音調校工作區 -->
+    <section class="card studio-card">
+      <div class="card-header space-between">
+        <div class="title-with-step">
+          <span class="step-num">3</span>
+          <h2>逐句解析與發音調校 (Sentence & Token Studio)</h2>
+        </div>
+        <div class="legend">
+          <span class="legend-item"><span class="dot-sample tone-sandhi"></span> 變調音節</span>
+          <span class="legend-item"><span class="dot-sample tone-base"></span> 本調音節</span>
+          <span class="legend-item"><span class="dot-sample unlisted"></span> 未收錄/自訂</span>
+        </div>
+      </div>
+      <p class="studio-intro">
+        點擊任何一個詞塊即可<b>即時修正讀音</b>、切換破音字或強制維持本調；系統會自動記憶至您的自訂詞庫！朗讀時當前句子將會自動高亮跟隨。
+      </p>
+
+      <div id="sentenceStudioList" class="sentence-list">
+        <div class="empty-state">請在上方輸入台語文章或點擊「載入 500+ 字範文」開始解析。</div>
+      </div>
+    </section>
+
+    <!-- 自訂詞庫與辭典管理 -->
+    <section class="card dict-card">
+      <div class="card-header">
+        <span class="step-num">4</span>
+        <h2>辭典與自訂發音庫管理</h2>
+      </div>
+      <div class="dict-actions-grid">
+        <div class="dict-status-box">
+          <strong>教育部辭典快取：</strong>
+          <span id="dictStatusText">連線檢測中...</span>
+          <button id="reloadDictBtn" class="btn btn-sm btn-outline">重新載入辭典快取</button>
+        </div>
+        <div class="dict-status-box">
+          <strong>自訂發音詞庫：</strong>
+          <span id="customCountText">已存 0 筆校正</span>
+          <div class="btn-group-sm">
+            <label class="btn btn-sm btn-outline" for="importCustomFile">匯入詞庫 (JSON/CSV)</label>
+            <input type="file" id="importCustomFile" accept=".json,.csv" hidden />
+            <button id="exportCustomBtn" class="btn btn-sm btn-outline">匯出自訂庫</button>
+            <button id="clearCustomBtn" class="btn btn-sm btn-ghost">清除詞庫</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 發音調校彈窗 (Pronunciation & Tone Tuner Modal) -->
+  <div id="tokenModal" class="modal-backdrop" hidden>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modalTitle">調整詞彙發音與聲調：<span id="modalHanzi">食飯</span></h3>
+        <button id="modalCloseBtn" class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <!-- 官方辭典候選 -->
+        <div class="modal-row">
+          <label>官方辭典破音字／候選讀音：</label>
+          <div id="modalCandidateList" class="candidate-pills"></div>
+        </div>
+
+        <!-- 逐音節聲調微調器 (全新功能) -->
+        <div class="modal-row">
+          <label>🎛️ 逐音節聲調修改盤（點擊調號立即更換唸法）：</label>
+          <div id="modalSyllableTuner" class="syllable-tuner-box">
+            <!-- 動態生成每個音節的 1~8 聲按鈕 -->
+          </div>
+        </div>
+
+        <div class="modal-row">
+          <label for="modalReadingInput">當前自訂讀音（可手動修改台羅／POJ／數字調）：</label>
+          <input type="text" id="modalReadingInput" placeholder="例如：tsia̍h-pn̄g 或 tsiah8-png7" />
+        </div>
+
+        <div class="modal-row checkbox-row">
+          <label class="checkbox-label">
+            <input type="checkbox" id="modalForceBaseTone" />
+            <span>強制維持此調號（不套用後續連讀變調規則，鎖定指定聲調）</span>
+          </label>
+        </div>
+
+        <div class="modal-row">
+          <label>變調與聽感預覽：</label>
+          <div id="modalSandhiPreview" class="sandhi-preview-box">-</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="modalTestPlayBtn" class="btn btn-outline">🔊 試聽修改後的唸法</button>
+        <div class="footer-right">
+          <button id="modalCancelBtn" class="btn btn-secondary">取消</button>
+          <button id="modalSaveBtn" class="btn btn-primary">儲存並套用新聲調</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 使用說明與參考文獻 Drawer -->
+  <div id="helpModal" class="modal-backdrop" hidden>
+    <div class="modal-card modal-large">
+      <div class="modal-header">
+        <h3>📖 Taigi TTS Studio 系統說明與參考來源</h3>
+        <button id="helpCloseBtn" class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body markdown-body">
+        <h4>🌟 系統三大核心特色</h4>
+        <ul>
+          <li><b>長文專屬管線（500+ 字以上）</b>：智慧分句切分標點，防止過載截斷，並提供即時進度跟隨條與全篇匯出。</li>
+          <li><b>多模型整合引擎</b>：整合 Microsoft Edge-TTS 類神經語音、Meta MMS-TTS VITS 開源模型、教育部辭典官方原聲拼接及 Web Speech。</li>
+          <li><b>台語連讀變調（Tone Sandhi）前處理</b>：解決 Meta MMS-TTS 只能吃 POJ 且原本缺乏變調推論導致的機械呆滯感，自動轉換為連讀變調 POJ！</li>
+        </ul>
+
+        <h4>🎵 台語連讀變調規則簡介</h4>
+        <p>台語除最後一個音節外，連續發音時必須依照嚴格規則變調：</p>
+        <ul>
+          <li><b>舒聲循環</b>：第 1 聲 → 7 聲 → 3 聲 → 2 聲 → 1 聲；第 5 聲 → 7 聲（南部）/ 3 聲（北部）。</li>
+          <li><b>入聲對調 (-p, -t, -k)</b>：第 4 聲 ↔ 第 8 聲互相對調。</li>
+          <li><b>喉塞入聲舒聲化 (-h)</b>：-h 韻尾脫落變成舒聲：第 4 聲 -h → 第 2 聲；第 8 聲 -h → 第 3 聲。</li>
+        </ul>
+
+        <h4>📚 參考資料與開源來源</h4>
+        <ul>
+          <li><b>Meta MMS (Massively Multilingual Speech)</b>: Pratap et al., <i>Scaling Speech Technology to 1,000+ Languages</i>, 2023. Model: <code>facebook/mms-tts-nan</code>.</li>
+          <li><b>教育部臺灣台語常用詞辭典</b>: 中華民國教育部 (g0v moedict 整理開源資料庫).</li>
+          <li><b>Microsoft Edge-TTS</b>: Azure Neural Cognitive Services (zh-TW-HsiaoChenNeural, zh-TW-YunJheNeural).</li>
+          <li><b>Taibun</b>: Python Taiwanese Romanisation and G2P Library.</li>
+        </ul>
+      </div>
+      <div class="modal-footer">
+        <button id="helpOkBtn" class="btn btn-primary">了解</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 引用 JavaScript 模組 -->
+  <script src="js/romanize.js"></script>
+  <script src="js/dict.js"></script>
+  <script src="js/audio_export.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

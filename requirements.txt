@@ -1,0 +1,10 @@
+edge-tts>=7.0.0
+taibun>=1.1.8
+fastapi>=0.110.0
+uvicorn>=0.28.0
+pydantic>=2.0.0
+pydub>=0.25.1
+soundfile>=0.12.1
+torch>=2.0.0
+transformers>=4.38.0
+scipy>=1.12.0
