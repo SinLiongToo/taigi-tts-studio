@@ -92,6 +92,9 @@
   let currentSentenceIndex = -1;
   let sentenceTimings = [];
   let currentAudioDataUrl = null;
+  let playSession = 0;            // 每次停止/重新播放都 +1，舊的播放迴圈看到不同 session 就自動退出
+  let pendingAudioResolve = null; // 目前正在等待播完的音檔 Promise，停止時直接放行避免卡住
+  const sentenceBlobCache = new Map(); // MMS/Edge 逐句音檔預先合成快取 (邊播邊算下一句)
 
   // 500+ 字台語精采範文 (662 字)
   const SAMPLE_ARTICLE = `台灣早市仔的滋味佮人情味
@@ -561,6 +564,8 @@
         } else {
           const chip = document.createElement('div');
           chip.className = 'token-chip';
+          chip.id = `token-${sIdx}-${tIdx}`;
+          t.chipElement = chip; // 供「唸到哪個字」高亮指示使用
           if (t.custom) chip.classList.add('customized');
           if (t.unlisted) chip.classList.add('unlisted');
 
@@ -815,23 +820,34 @@
   // ========================================================================
   async function playSingleSentence(sIdx) {
     if (sIdx < 0 || sIdx >= parsedSentences.length) return;
+    // 先停掉其他正在播的聲音，再開一個新的播放 session
+    stopAudio();
+    const session = playSession;
+    isPlaying = true;
+    updatePlayerButtons();
     const item = parsedSentences[sIdx];
     highlightSentence(sIdx);
 
     try {
       if (modelSelect.value === 'moe_concat') {
         playerStatus.textContent = `🔊 正在播放教育部真人台語原聲 (第 ${sIdx + 1} 句)...`;
-        await playSentenceViaMoeAudio(sIdx);
-        playerStatus.textContent = '試聽結束';
+        await playSentenceViaMoeAudio(sIdx, session);
+        if (session === playSession) playerStatus.textContent = '試聽結束';
       } else if (backendOnline && (modelSelect.value === 'edge' || modelSelect.value === 'mms')) {
         playerStatus.textContent = `正在試聽第 ${sIdx + 1} 句 (${modelSelect.value === 'mms' ? 'Meta MMS 台語' : 'Edge-TTS'})...`;
-        await playViaBackend(item.text, sIdx);
+        await playViaBackend(item.text, sIdx, session);
       } else {
-        await playViaFrontend(item.text, sIdx);
+        await playViaFrontend(item.text, sIdx, session);
       }
     } catch (e) {
       console.error(e);
       playerStatus.textContent = `播放失敗: ${e.message}`;
+    } finally {
+      if (session === playSession) {
+        setSpeakingWord(null);
+        isPlaying = false;
+        updatePlayerButtons();
+      }
     }
   }
 
@@ -935,6 +951,14 @@
         highlightSentence(matchedIdx);
         currentSentenceLabel.textContent = `第 ${matchedIdx + 1} / ${timings.length} 句`;
       }
+      // 句內依字數比例估算目前唸到的詞
+      if (matchedIdx !== -1) {
+        const tm = timings[matchedIdx];
+        const span = Math.max(1, tm.end_ms - tm.start_ms);
+        const frac = Math.min(0.999, Math.max(0, (currentMs - tm.start_ms) / span));
+        const w = wordAtFraction(matchedIdx, frac);
+        if (w) setSpeakingWord(w, matchedIdx);
+      }
     });
 
     currentAudio.addEventListener('ended', () => {
@@ -946,8 +970,8 @@
     playerStatus.textContent = '正在朗讀全文...';
   }
 
-  async function playSentencesSequentially(idx) {
-    if (!isPlaying) return;
+  async function playSentencesSequentially(idx, session = playSession) {
+    if (!isPlaying || session !== playSession) return;
     if (idx >= parsedSentences.length) {
       playerStatus.textContent = '全文朗讀完畢！';
       stopAudio();
@@ -962,52 +986,94 @@
     try {
       if (modelSelect.value === 'moe_concat') {
         playerStatus.textContent = `🔊 正在播放教育部真人原聲 (第 ${idx + 1} / ${parsedSentences.length} 句)...`;
-        await playSentenceViaMoeAudio(idx);
-      } else if (modelSelect.value === 'mms') {
+        await playSentenceViaMoeAudio(idx, session);
+      } else if (modelSelect.value === 'mms' && backendOnline) {
         playerStatus.textContent = `🔬 正在朗讀第 ${idx + 1} / ${parsedSentences.length} 句 (Meta MMS 台語)...`;
-        await playViaBackend(item.text, idx);
+        // 先送出這一句的合成請求，再在背景預先合成下一句，句與句之間不用再等
+        const playing = playViaBackend(item.text, idx, session);
+        if (idx + 1 < parsedSentences.length) {
+          fetchSentenceBlob(parsedSentences[idx + 1].text).catch(() => {});
+        }
+        await playing;
       } else {
-        await playViaFrontend(item.text, idx);
+        await playViaFrontend(item.text, idx, session);
       }
+      if (session !== playSession) return;
       const pause = parseInt(pauseRange.value, 10);
       setTimeout(() => {
-        if (isPlaying) {
-          playSentencesSequentially(idx + 1);
+        if (isPlaying && session === playSession) {
+          playSentencesSequentially(idx + 1, session);
         }
       }, pause);
     } catch (e) {
       console.warn(e);
-      playSentencesSequentially(idx + 1);
+      if (session === playSession) playSentencesSequentially(idx + 1, session);
     }
   }
 
-  function playViaBackend(text, sIdx) {
+  function sentenceCacheKey(text) {
+    return [modelSelect.value, voiceSelect.value, formatEdgeRate(speedRange.value), sandhiToggle.checked, text].join('|');
+  }
+
+  // 向後端合成單句音檔 (有快取：同樣的句子與設定不重算)
+  function fetchSentenceBlob(text) {
+    const key = sentenceCacheKey(text);
+    if (sentenceBlobCache.has(key)) return sentenceBlobCache.get(key);
+    const p = fetch(`${backendBaseUrl}/api/tts/synthesize`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: text,
+        model: modelSelect.value,
+        voice: voiceSelect.value,
+        rate: formatEdgeRate(speedRange.value),
+        apply_sandhi: sandhiToggle.checked,
+        pause_ms: 100
+      })
+    }).then(res => {
+      if (!res.ok) throw new Error('伺服器錯誤');
+      return res.blob();
+    });
+    p.catch(() => sentenceBlobCache.delete(key)); // 失敗就不要留在快取裡
+    sentenceBlobCache.set(key, p);
+    if (sentenceBlobCache.size > 60) {
+      sentenceBlobCache.delete(sentenceBlobCache.keys().next().value);
+    }
+    return p;
+  }
+
+  function playViaBackend(text, sIdx, session = playSession) {
     return new Promise(async (resolve, reject) => {
       try {
-        const model = modelSelect.value;
-        const res = await fetch(`${backendBaseUrl}/api/tts/synthesize`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            text: text,
-            model: model,
-            voice: voiceSelect.value,
-            rate: formatEdgeRate(speedRange.value),
-            apply_sandhi: sandhiToggle.checked,
-            pause_ms: 100
-          })
-        });
-        if (!res.ok) throw new Error('伺服器錯誤');
-        const blob = await res.blob();
+        const blob = await fetchSentenceBlob(text);
+        if (session !== playSession) return resolve();
         const url = URL.createObjectURL(blob);
         const audio = new Audio(url);
         audio.playbackRate = parseFloat(speedRange.value);
-        audio.onended = () => {
-          playerStatus.textContent = '試聽結束';
+        currentAudio = audio;
+        attachWordTracker(audio, sIdx);
+
+        let done = false;
+        const finish = () => {
+          if (done) return;
+          done = true;
+          if (pendingAudioResolve === finish) pendingAudioResolve = null;
+          URL.revokeObjectURL(url);
           resolve();
         };
-        audio.onerror = reject;
-        audio.play();
+        pendingAudioResolve = finish;
+        audio.onended = () => {
+          if (session === playSession) playerStatus.textContent = '試聽結束';
+          finish();
+        };
+        audio.onerror = (e) => {
+          if (pendingAudioResolve === finish) pendingAudioResolve = null;
+          reject(e);
+        };
+        audio.play().catch(err => {
+          console.warn('播放被瀏覽器限制或失敗:', err);
+          finish();
+        });
       } catch (err) {
         reject(err);
       }
@@ -1054,73 +1120,186 @@
     }
   }
 
-  // 依序播放音訊陣列 (Promise 串接)
-  function playAudioUrl(url, rate = 1.0) {
+  // 播放單一音檔 (Promise)。按「停止」時會立刻放行，不會讓播放迴圈卡住。
+  function playAudioUrl(url, rate = 1.0, session = playSession) {
     return new Promise((resolve) => {
-      if (!url) return resolve();
+      if (!url || session !== playSession) return resolve();
       const a = new Audio(url);
       a.playbackRate = rate;
-      a.onended = resolve;
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        if (pendingAudioResolve === finish) pendingAudioResolve = null;
+        if (currentAudio === a) currentAudio = null;
+        resolve();
+      };
+      pendingAudioResolve = finish;
+      currentAudio = a; // 讓「暫停 / 繼續」按鈕也能控制逐詞音檔
+      a.onended = finish;
       a.onerror = () => {
         console.warn('音檔載入失敗:', url);
-        resolve();
+        finish();
       };
       a.play().catch((err) => {
         console.warn('播放被瀏覽器限制或失敗:', err);
-        resolve();
+        finish();
       });
     });
   }
 
-  // 教育部辭典真人錄音：整句依序朗讀各詞 (帶有醒目的念到哪裡高亮跟隨指示)
-  async function playSentenceViaMoeAudio(sIdx) {
-    if (sIdx < 0 || sIdx >= parsedSentences.length) return;
-    const sItem = parsedSentences[sIdx];
-    const tokens = sItem.tokens || [];
-    const rate = parseFloat(speedRange.value);
+  // ---------- 「唸到哪個字」指示 (Speaking Indicator) ----------
 
-    for (let t of tokens) {
-      if (!isPlaying && !isPaused) break;
-      if (t.type !== 'word') continue;
-
-      // 🌟 念到哪裡的高亮跟隨指示 (Speaking Indicator)
-      document.querySelectorAll('.token-chip').forEach(c => c.classList.remove('speaking-now'));
-      if (t.chipElement) {
-        t.chipElement.classList.add('speaking-now');
-        t.chipElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
-
-      let audioUrl = t.audio_url;
-      // 若詞塊無整詞音檔，嘗試逐字備援音檔
-      if (!audioUrl && t.fallback_audios && t.fallback_audios.length) {
-        for (let subUrl of t.fallback_audios) {
-          if (!isPlaying && !isPaused) break;
-          await playAudioUrl(subUrl, rate);
-        }
-      } else if (audioUrl) {
-        await playAudioUrl(audioUrl, rate);
-      } else {
-        await new Promise(r => setTimeout(r, 220));
-      }
-
-      if (t.chipElement) {
-        t.chipElement.classList.remove('speaking-now');
-      }
+  // 標示目前正在唸的詞：詞塊發光 + 狀態列顯示「▶ 漢字 (羅馬字)」
+  function setSpeakingWord(t, sIdx) {
+    document.querySelectorAll('.token-chip.speaking-now').forEach(c => c.classList.remove('speaking-now'));
+    if (!t) return;
+    if (t.chipElement) {
+      t.chipElement.classList.add('speaking-now');
+      t.chipElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      const romanEl = t.chipElement.querySelector('.token-roman');
+      const roman = romanEl ? romanEl.textContent : '';
+      const where = typeof sIdx === 'number' ? `第 ${sIdx + 1} 句 ` : '';
+      playerStatus.textContent = `▶ ${where}正在唸：「${t.hanzi}」${roman && roman !== t.hanzi ? ` ${roman}` : ''}`;
     }
-    document.querySelectorAll('.token-chip').forEach(c => c.classList.remove('speaking-now'));
   }
 
-  function playViaFrontend(text, sIdx) {
+  function sentenceWords(sIdx) {
+    const item = parsedSentences[sIdx];
+    return item ? (item.tokens || []).filter(t => t.type === 'word') : [];
+  }
+
+  // 依「字數比例」從句子進度 (0~1) 估算目前唸到第幾個詞 (給 MMS / Edge 整句音檔用)
+  function wordAtFraction(sIdx, frac) {
+    const words = sentenceWords(sIdx);
+    if (!words.length) return null;
+    const weights = words.map(t => Math.max(1, Array.from(t.hanzi || '').length));
+    const total = weights.reduce((a, b) => a + b, 0);
+    let acc = 0;
+    for (let i = 0; i < words.length; i++) {
+      acc += weights[i];
+      if (frac < acc / total) return words[i];
+    }
+    return words[words.length - 1];
+  }
+
+  // 依瀏覽器 TTS 回報的字元位置找出對應的詞 (給 Web Speech 用)
+  function wordAtCharIndex(sIdx, charIndex) {
+    const item = parsedSentences[sIdx];
+    if (!item) return null;
+    let pos = 0;
+    for (const t of item.tokens || []) {
+      const len = (t.type === 'word' ? t.hanzi : t.text || '').length;
+      if (charIndex < pos + len) return t.type === 'word' ? t : null;
+      pos += len;
+    }
+    return null;
+  }
+
+  // 整句音檔播放時，用 requestAnimationFrame 連續追蹤進度並移動高亮
+  function attachWordTracker(audio, sIdx) {
+    if (!sentenceWords(sIdx).length) return;
+    let last = null;
+    const tick = () => {
+      if (audio !== currentAudio || audio.paused || audio.ended) return;
+      const d = audio.duration;
+      if (d && isFinite(d)) {
+        const w = wordAtFraction(sIdx, Math.min(0.999, audio.currentTime / d));
+        if (w && w !== last) {
+          last = w;
+          setSpeakingWord(w, sIdx);
+        }
+      }
+      requestAnimationFrame(tick);
+    };
+    audio.addEventListener('play', () => requestAnimationFrame(tick));
+    audio.addEventListener('ended', () => setSpeakingWord(null));
+  }
+
+  // 找出某個詞要播的教育部音檔：使用者自訂讀音 > 辭典整詞音檔 > 逐字備援
+  function resolveTokenAudio(t) {
+    const hasDict = typeof Dict !== 'undefined' && Dict.isLoaded();
+    const override = t.override || customOverrides.get(t.hanzi);
+
+    // 1. 使用者在聲調修改盤改過的讀音：借用同音字音檔
+    if (hasDict && override && override.reading && typeof Romanize !== 'undefined') {
+      const sylls = Romanize.parseWord(override.reading);
+      const found = sylls && sylls.length ? Dict.findAudioForSyllables(sylls) : null;
+      if (Array.isArray(found)) return { url: null, parts: found };
+      if (found) return { url: found, parts: [] };
+    }
+
+    // 2. 後端已經附上的音檔
+    if (t.audio_url) return { url: t.audio_url, parts: [] };
+    if (t.fallback_audios && t.fallback_audios.length) return { url: null, parts: t.fallback_audios };
+    if (!hasDict) return { url: null, parts: [] };
+
+    // 3. 前端辭典整詞音檔
+    if (t.entries && t.entries.length) {
+      const url = Dict.resolveAudioUrl(t.entries[t.choice || 0]);
+      if (url) return { url, parts: [] };
+    }
+
+    // 4. 逐字備援
+    const parts = [];
+    for (const ch of Array.from(t.hanzi || '')) {
+      const e = Dict.lookupWord(ch);
+      const u = e && e.length ? Dict.resolveAudioUrl(e[0]) : null;
+      if (u) parts.push(u);
+    }
+    return { url: null, parts };
+  }
+
+  // 教育部辭典真人錄音：整句依序朗讀各詞 (每個詞都有精確的「唸到哪裡」高亮)
+  async function playSentenceViaMoeAudio(sIdx, session = playSession) {
+    if (sIdx < 0 || sIdx >= parsedSentences.length) return;
+    const tokens = parsedSentences[sIdx].tokens || [];
+    const rate = parseFloat(speedRange.value);
+
+    for (const t of tokens) {
+      if (session !== playSession) break;
+      if (t.type !== 'word') continue;
+
+      setSpeakingWord(t, sIdx);
+
+      const { url, parts } = resolveTokenAudio(t);
+      if (url) {
+        await playAudioUrl(url, rate, session);
+      } else if (parts.length) {
+        for (const subUrl of parts) {
+          if (session !== playSession) break;
+          await playAudioUrl(subUrl, rate, session);
+        }
+      } else {
+        // 查無音檔：仍停留一下讓使用者看得到唸到哪 (詞塊上會標示)
+        await new Promise(r => setTimeout(r, 220));
+      }
+    }
+    if (session === playSession) setSpeakingWord(null);
+  }
+
+  function playViaFrontend(text, sIdx, session = playSession) {
     return new Promise(async (resolve) => {
       if (modelSelect.value === 'moe_concat') {
         // 教育部真人原聲拼接
-        await playSentenceViaMoeAudio(sIdx);
+        await playSentenceViaMoeAudio(sIdx, session);
         resolve();
       } else if (modelSelect.value === 'web_speech' && 'speechSynthesis' in window) {
         const utter = new SpeechSynthesisUtterance(text);
         utter.rate = parseFloat(speedRange.value);
-        utter.onend = resolve;
-        utter.onerror = resolve;
+        // 瀏覽器回報目前唸到的字元位置 → 對應到詞塊高亮
+        utter.onboundary = (ev) => {
+          if (session !== playSession) return;
+          const w = wordAtCharIndex(sIdx, ev.charIndex);
+          if (w) setSpeakingWord(w, sIdx);
+        };
+        const done = () => {
+          if (pendingAudioResolve === done) pendingAudioResolve = null;
+          resolve();
+        };
+        pendingAudioResolve = done;
+        utter.onend = done;
+        utter.onerror = done;
         speechSynthesis.speak(utter);
       } else {
         setTimeout(resolve, 800);
@@ -1141,6 +1320,7 @@
   }
 
   function stopAudio() {
+    playSession++; // 讓所有舊的播放迴圈自動退出
     isPlaying = false;
     isPaused = false;
     if (currentAudio) {
@@ -1148,6 +1328,13 @@
       currentAudio.currentTime = 0;
       currentAudio = null;
     }
+    if (pendingAudioResolve) {
+      const r = pendingAudioResolve;
+      pendingAudioResolve = null;
+      r();
+    }
+    setSpeakingWord(null);
+    pauseBtn.innerHTML = '<span class="icon">⏸</span> 暫停';
     if ('speechSynthesis' in window) {
       speechSynthesis.cancel();
     }
