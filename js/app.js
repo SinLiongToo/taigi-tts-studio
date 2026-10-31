@@ -49,6 +49,7 @@
   const totalTimeLabel = el('totalTimeLabel');
 
   const sentenceStudioList = el('sentenceStudioList');
+  const copyRomanBtn = el('copyRomanBtn');
 
   const dictStatusText = el('dictStatusText');
   const reloadDictBtn = el('reloadDictBtn');
@@ -183,6 +184,20 @@ Tse1 to7 si7 Tai5-uan5 e5 tsa2-tshi7-a2, tshiong1-buan2 thoo2-te7 e5 sinn3-mia7-
   helpCloseBtn.addEventListener('click', () => { helpModal.hidden = true; });
   helpOkBtn.addEventListener('click', () => { helpModal.hidden = true; });
 
+  // 說明彈窗多分頁 (Tabs) 切換邏輯
+  const helpTabBtns = document.querySelectorAll('.help-tab-btn');
+  const helpTabPanes = document.querySelectorAll('.help-tab-pane');
+  helpTabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const targetId = btn.dataset.tab;
+      helpTabBtns.forEach(b => b.classList.remove('active'));
+      helpTabPanes.forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      const targetPane = document.getElementById(targetId);
+      if (targetPane) targetPane.classList.add('active');
+    });
+  });
+
   // 點擊彈窗外部背景關閉
   helpModal.addEventListener('click', (e) => {
     if (e.target === helpModal) {
@@ -196,11 +211,38 @@ Tse1 to7 si7 Tai5-uan5 e5 tsa2-tshi7-a2, tshiong1-buan2 thoo2-te7 e5 sinn3-mia7-
     }
   });
 
-  // 按下 ESC 鍵關閉所有彈窗
+  // 全域鍵盤快捷鍵 (Global Keyboard Shortcuts)
   window.addEventListener('keydown', (e) => {
+    // 1. ESC 鍵關閉所有彈窗
     if (e.key === 'Escape') {
       helpModal.hidden = true;
       tokenModal.hidden = true;
+      return;
+    }
+
+    const activeEl = document.activeElement;
+    const isEditing = activeEl && (
+      activeEl.tagName === 'TEXTAREA' ||
+      activeEl.tagName === 'INPUT' ||
+      activeEl.tagName === 'SELECT' ||
+      activeEl.isContentEditable
+    );
+
+    // 2. Ctrl + Enter 或 Cmd + Enter: 不論游標在哪，一鍵立即朗讀全文
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      playFullArticle();
+      return;
+    }
+
+    // 3. 空白鍵 (Space): 非打字狀態且彈窗關閉時，快速切換播放 / 暫停
+    if (e.code === 'Space' && !isEditing && helpModal.hidden && tokenModal.hidden) {
+      e.preventDefault();
+      if (isPlaying) {
+        pauseBtn.click();
+      } else {
+        playFullArticle();
+      }
     }
   });
 
@@ -256,12 +298,20 @@ Tse1 to7 si7 Tai5-uan5 e5 tsa2-tshi7-a2, tshiong1-buan2 thoo2-te7 e5 sinn3-mia7-
       voiceSelect.innerHTML = `<option value="moe" selected>教育部官方真人台語錄音</option>`;
     } else if (currentModel === 'mms') {
       activeModelTag.textContent = 'Meta MMS-TTS (正港台語 VITS 模型)';
-      modelHint.textContent = 'Meta 官方台語端到端 VITS 模型。結合本系統連讀變調 POJ Pipeline，正港台語發音 (本機 CPU 運算約需數秒)。';
+      if (!backendOnline) {
+        modelHint.innerHTML = '⚠️ <strong style="color:var(--warning)">目前處於 GitHub Pages 純前端離線模式</strong>：Meta MMS 需本機執行 <code>python server.py</code>；或選擇「教育部臺灣台語辭典」直接於瀏覽器開箱朗讀！';
+      } else {
+        modelHint.textContent = 'Meta 官方台語端到端 VITS 模型。結合本系統連讀變調 POJ Pipeline，正港台語發音 (本機 CPU 運算約需數秒)。';
+      }
       voiceGroup.style.display = 'flex';
       voiceSelect.innerHTML = `<option value="default" selected>Meta MMS 台語講者 (facebook/mms-tts-nan)</option>`;
     } else if (currentModel === 'edge') {
       activeModelTag.textContent = 'Microsoft Edge-TTS (臺灣腔國語/華語混讀)';
-      modelHint.textContent = '微軟神經語音（zh-TW-HsiaoChenNeural 為臺灣國語/華語腔調，非純台語發音）。';
+      if (!backendOnline) {
+        modelHint.innerHTML = '⚠️ <strong style="color:var(--warning)">目前處於 GitHub Pages 純前端離線模式</strong>：Edge-TTS 需本機執行 <code>python server.py</code> 轉發 API；或選擇「教育部臺灣台語辭典」直接於瀏覽器開箱朗讀！';
+      } else {
+        modelHint.textContent = '微軟神經語音（zh-TW-HsiaoChenNeural 為臺灣國語/華語腔調，非純台語發音）。';
+      }
       voiceGroup.style.display = 'flex';
       voiceSelect.innerHTML = `
         <option value="HsiaoChen" selected>曉臻 (HsiaoChen - 臺灣國語女聲)</option>
@@ -390,6 +440,44 @@ Tse1 to7 si7 Tai5-uan5 e5 tsa2-tshi7-a2, tshiong1-buan2 thoo2-te7 e5 sinn3-mia7-
     reAnalyzeText();
     stopAudio();
   });
+
+  if (copyRomanBtn) {
+    copyRomanBtn.addEventListener('click', async () => {
+      const text = articleInput.value.trim();
+      if (!text) {
+        alert('請先在上方輸入文章或載入範文！');
+        return;
+      }
+      const sentences = splitTextToSentences(text);
+      if (!sentences.length) return;
+
+      const scheme = currentRomanScheme();
+      const applySandhi = sandhiToggle.checked;
+      const lines = sentences.map(s => {
+        const segs = segmentSentence(s);
+        return segs.map(tok => {
+          if (!tok.isHan) return tok.text;
+          const read = tok.customReading || tok.reading;
+          let output = applySandhi && !tok.forceBase ? tok.sandhi : read;
+          if (scheme === 'poj') {
+            output = Romanize.tailoToPoj(output);
+          } else {
+            output = Romanize.pojToTailo(output);
+          }
+          return output;
+        }).join(' ');
+      });
+      const fullRoman = lines.join('\n');
+      try {
+        await navigator.clipboard.writeText(fullRoman);
+        const originalText = copyRomanBtn.textContent;
+        copyRomanBtn.textContent = '✅ 已複製拼音！';
+        setTimeout(() => { copyRomanBtn.textContent = originalText; }, 2000);
+      } catch (err) {
+        prompt('請手動複製下列台語連讀變調拼音文本：', fullRoman);
+      }
+    });
+  }
 
   // ========================================================================
   // 4. 文本解析與逐句 Studio 渲染

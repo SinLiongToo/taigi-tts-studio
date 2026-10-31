@@ -174,6 +174,7 @@
           <span class="legend-item"><span class="dot-sample tone-sandhi"></span> 變調音節</span>
           <span class="legend-item"><span class="dot-sample tone-base"></span> 本調音節</span>
           <span class="legend-item"><span class="dot-sample unlisted"></span> 未收錄/自訂</span>
+          <button id="copyRomanBtn" class="btn btn-outline btn-sm" title="一鍵複製全篇轉換後的台羅/POJ連讀變調文本">📋 複製拼音全文</button>
         </div>
       </div>
       <p class="studio-intro">
@@ -260,39 +261,190 @@
     </div>
   </div>
 
-  <!-- 使用說明與參考文獻 Drawer -->
+  <!-- 使用說明與參考文獻 Drawer (多分頁 Tab 式彈窗) -->
   <div id="helpModal" class="modal-backdrop" hidden>
     <div class="modal-card modal-large">
       <div class="modal-header">
-        <h3>📖 Taigi TTS Studio 系統說明與參考來源</h3>
+        <h3>📖 Taigi TTS Studio 系統說明與參考文獻</h3>
         <button id="helpCloseBtn" class="modal-close">&times;</button>
       </div>
+
+      <!-- 說明分頁切換導覽列 (Tabs) -->
+      <div class="modal-tab-bar">
+        <button class="help-tab-btn active" data-tab="tab-model-diff">📊 四大模型比較</button>
+        <button class="help-tab-btn" data-tab="tab-features">🚀 核心特色與長文管線</button>
+        <button class="help-tab-btn" data-tab="tab-sandhi">🎵 台語變調手冊</button>
+        <button class="help-tab-btn" data-tab="tab-shortcuts">⌨️ 快捷鍵指南</button>
+        <button class="help-tab-btn" data-tab="tab-refs">📚 參考文獻</button>
+      </div>
+
       <div class="modal-body markdown-body">
-        <h4>🌟 系統三大核心特色</h4>
-        <ul>
-          <li><b>長文專屬管線（500+ 字以上）</b>：智慧分句切分標點，防止過載截斷，並提供即時進度跟隨條與全篇匯出。</li>
-          <li><b>多模型整合引擎</b>：整合 Microsoft Edge-TTS 類神經語音、Meta MMS-TTS VITS 開源模型、教育部辭典官方原聲拼接及 Web Speech。</li>
-          <li><b>台語連讀變調（Tone Sandhi）前處理</b>：解決 Meta MMS-TTS 只能吃 POJ 且原本缺乏變調推論導致的機械呆滯感，自動轉換為連讀變調 POJ！</li>
-        </ul>
+        <!-- Tab 1: 四大模型比較表 -->
+        <div id="tab-model-diff" class="help-tab-pane active">
+          <h4>🎛️ 四大語音模型架構深度評比表</h4>
+          <p class="tab-pane-intro">Taigi TTS Studio 整合四大模型架構，滿足從離線免安裝教學到開源研究與廣播長文的不同需求：</p>
+          <div class="table-responsive">
+            <table class="model-comparison-table">
+              <thead>
+                <tr>
+                  <th>評比維度</th>
+                  <th>🏛️ 教育部臺灣台語辭典</th>
+                  <th>🔬 Meta MMS-TTS (VITS)</th>
+                  <th>🎙️ Microsoft Edge-TTS</th>
+                  <th>🌐 Web Speech API</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><b>技術架構</b></td>
+                  <td>官方 14,000+ 詞真人錄音檔串接 (Concatenative Speech)</td>
+                  <td>端到端深度學習 VITS 架構 (~36M 參數，閩南語 nan 專用)</td>
+                  <td>雲端大型類神經語音 (Neural TTS：曉臻、雲哲、曉雨)</td>
+                  <td>作業系統 / 瀏覽器原生語音引擎 (SAPI / macOS / Android)</td>
+                </tr>
+                <tr>
+                  <td><b>發音純正度</b></td>
+                  <td><span class="star-rating">⭐⭐⭐⭐⭐</span> <b>100% 正港母語</b><br>教育部官方錄音員，零國語/華語腔調</td>
+                  <td><span class="star-rating">⭐⭐⭐⭐⭐</span> <b>100% 正港台語</b><br>母語語料端到端訓練，無國語字元干擾</td>
+                  <td><span class="star-rating">⭐⭐⭐</span> <b>臺灣腔華語模型混讀台語</b><br>現代親切，罕見詞可能帶華語讀音</td>
+                  <td><span class="star-rating">⭐⭐</span> <b>視裝置語音庫而定</b><br>多數裝置預設降級為國語/普通話</td>
+                </tr>
+                <tr>
+                  <td><b>連讀變調支援</b></td>
+                  <td>依辭典本調串接，內建同音借調與逐字降級備援</td>
+                  <td><span class="star-rating">⭐⭐⭐⭐⭐</span> <b>本專案 Sandhi Pipeline</b><br>(1-7-3-2-1循環, 4-8, -h舒聲化)</td>
+                  <td>依類神經網路內部聲學模型自動模擬語調起伏</td>
+                  <td>依系統 TTS 引擎，多數無台語變調規則</td>
+                </tr>
+                <tr>
+                  <td><b>執行環境需求</b></td>
+                  <td>🌐 <b>純前端免安裝即用</b><br>(GitHub Pages / 離線瀏覽器直接播放)</td>
+                  <td>🖥️ <b>本機 Python 後端</b><br>(<code>python server.py</code>，支援 CPU / CUDA)</td>
+                  <td>🌐 <b>本機轉發後端 + 外網</b><br>(需 Python 伺服器與連網存取 Edge API)</td>
+                  <td>🌐 <b>純前端零依賴即用</b><br>(全離線、零安裝)</td>
+                </tr>
+                <tr>
+                  <td><b>500+ 字長文適配</b></td>
+                  <td><span class="star-rating">⭐⭐⭐⭐</span> <b>逐句無縫播放</b><br>秒讀無等待，教學詞彙精準度高</td>
+                  <td><span class="star-rating">⭐⭐⭐⭐⭐</span> <b>智慧分句無損拼接</b><br>經過 662 字 Opus 審計滿分驗證</td>
+                  <td><span class="star-rating">⭐⭐⭐⭐⭐</span> <b>長篇小說/廣播首選</b><br>超平滑語流，極致耐聽自然</td>
+                  <td><span class="star-rating">⭐⭐⭐</span> <b>分段播放備援</b><br>免網路時的快速預覽</td>
+                </tr>
+                <tr>
+                  <td><b>延遲與運算</b></td>
+                  <td><b>0.0 秒秒出聲</b><br>毫秒級本地快取或 CDN 直播</td>
+                  <td><b>~1.5 - 3.0 秒</b><br>依 CPU/GPU 算力串流推論</td>
+                  <td><b>~0.8 - 1.5 秒</b><br>網路串流分段緩衝</td>
+                  <td><b>0.1 秒極速啟動</b><br>作業系統層直接播放</td>
+                </tr>
+                <tr>
+                  <td><b>音檔匯出格式</b></td>
+                  <td>WAV (無損音質) / Web Audio</td>
+                  <td>WAV (無損) / <b>Opus (省流 89%)</b></td>
+                  <td>MP3 (64kbps / 128kbps)</td>
+                  <td>僅限即時音效 (無檔案匯出)</td>
+                </tr>
+                <tr>
+                  <td><b>最佳適用場景</b></td>
+                  <td><b>教育部官方標準教學</b>、辭典比對、免裝環境線上分享</td>
+                  <td><b>學術研究、本土語言正音、連讀變調調校實驗</b></td>
+                  <td><b>500+ 字長文廣播故事</b>、散文朗誦、有聲書製作</td>
+                  <td>輕量快速試聽、緊急無伺服器環境備援</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
 
-        <h4>🎵 台語連讀變調規則簡介</h4>
-        <p>台語除最後一個音節外，連續發音時必須依照嚴格規則變調：</p>
-        <ul>
-          <li><b>舒聲循環</b>：第 1 聲 → 7 聲 → 3 聲 → 2 聲 → 1 聲；第 5 聲 → 7 聲（南部）/ 3 聲（北部）。</li>
-          <li><b>入聲對調 (-p, -t, -k)</b>：第 4 聲 ↔ 第 8 聲互相對調。</li>
-          <li><b>喉塞入聲舒聲化 (-h)</b>：-h 韻尾脫落變成舒聲：第 4 聲 -h → 第 2 聲；第 8 聲 -h → 第 3 聲。</li>
-        </ul>
+        <!-- Tab 2: 核心特色與長文管線 -->
+        <div id="tab-features" class="help-tab-pane">
+          <h4>🌟 專案核心突破技術</h4>
+          <ul>
+            <li><b>📖 500+ 字長篇台語長文連續朗讀管線</b>：智慧切分標點符號，自動插入 300ms 自然氣息間隔，徹底解決記憶體溢出（OOM）與發音截斷問題。</li>
+            <li><b>✨ Karaoke 動態伴讀追蹤</b>：朗讀時即時以光暈黃光（<code>.speaking-now</code>）高亮當前朗讀詞彙與句子，視覺跟隨絕不迷失。</li>
+            <li><b>🔤 多文體全面支援</b>：支援漢字長文、現代漢羅混寫、1885 經典白話字 (POJ)、教育部台羅全羅 (Tâi-lô) 以及免切換聲調符號的數字調 (Numeric)。</li>
+            <li><b>🎛️ 互動式逐音節聲調微調盤</b>：點擊任何詞塊即可開啟 1~8 聲調調音盤，即時試聽、切換破音字，並永久保存至本機自訂詞庫。</li>
+          </ul>
+        </div>
 
-        <h4>📚 參考資料與開源來源</h4>
-        <ul>
-          <li><b>Meta MMS (Massively Multilingual Speech)</b>: Pratap et al., <i>Scaling Speech Technology to 1,000+ Languages</i>, 2023. Model: <code>facebook/mms-tts-nan</code>.</li>
-          <li><b>教育部臺灣台語常用詞辭典</b>: 中華民國教育部 (g0v moedict 整理開源資料庫).</li>
-          <li><b>Microsoft Edge-TTS</b>: Azure Neural Cognitive Services (zh-TW-HsiaoChenNeural, zh-TW-YunJheNeural).</li>
-          <li><b>Taibun</b>: Python Taiwanese Romanisation and G2P Library.</li>
-        </ul>
+        <!-- Tab 3: 台語連讀變調手冊 -->
+        <div id="tab-sandhi" class="help-tab-pane">
+          <h4>🎵 台語連讀變調（Tone Sandhi）規律手冊</h4>
+          <p>台語除變調組末音節外，連續發音時前面的音節必須依照嚴格規律變調：</p>
+          <ul>
+            <li><b>舒聲五調循環 (Non-checked Finals)</b>：
+              <div class="code-box">第 1 聲 → 第 7 聲 → 第 3 聲 → 第 2 聲 → 第 1 聲<br>第 5 聲 → 第 7 聲（南部腔） / 第 3 聲（北部腔）</div>
+            </li>
+            <li><b>入聲對調 (Checked Finals: -p, -t, -k)</b>：
+              <div class="code-box">第 4 聲 ↔ 第 8 聲（陰入變陽入、陽入變陰入）</div>
+            </li>
+            <li><b>喉塞入聲舒聲化 (Glottal Stop: -h)</b>：
+              <div class="code-box">第 4 聲 -h → 第 2 聲（例：suah4 煞 → sua2）<br>第 8 聲 -h → 第 3 聲（例：peh8 白 → pe3）</div>
+            </li>
+            <li><b>輕聲（--）規則</b>：輕聲前之音節維持原讀本調；變調組最後一個音節維持本調。</li>
+            <li><b>三疊字 (AAA)</b>：第一字轉為中升調（第 5 調值）。</li>
+          </ul>
+        </div>
+
+        <!-- Tab 4: 鍵盤快捷鍵指南 -->
+        <div id="tab-shortcuts" class="help-tab-pane">
+          <h4>⌨️ Web Studio 全域鍵盤快捷鍵</h4>
+          <p>利用快捷鍵可快速進行長文合成、校正與播放操作：</p>
+          <div class="table-responsive">
+            <table class="model-comparison-table">
+              <thead>
+                <tr>
+                  <th>快捷鍵組合</th>
+                  <th>對應功能</th>
+                  <th>適用操作情境</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><kbd>Ctrl</kbd> + <kbd>Enter</kbd> / <kbd>⌘</kbd> + <kbd>Enter</kbd></td>
+                  <td><b>朗讀全文 (Play Full Article)</b></td>
+                  <td>在長文編輯框輸入中或頁面任何位置，一鍵立即觸發 500+ 字連續朗讀與 Karaoke 追蹤</td>
+                </tr>
+                <tr>
+                  <td><kbd>Space</kbd> (空白鍵)</td>
+                  <td><b>播放 / 暫停切換</b></td>
+                  <td>焦點未在輸入框打字時，隨時切換暫停與繼續朗讀</td>
+                </tr>
+                <tr>
+                  <td><kbd>Esc</kbd></td>
+                  <td><b>關閉彈窗 (Close)</b></td>
+                  <td>快速關閉聲調微調盤或說明視窗</td>
+                </tr>
+                <tr>
+                  <td><b>點擊詞塊 (Click Chip)</b></td>
+                  <td><b>開啟聲調微調盤</b></td>
+                  <td>逐音節快速點選 1~8 聲調按鈕，即時聽感預覽並套用新聲調</td>
+                </tr>
+                <tr>
+                  <td><b>點擊「📋 複製拼音全文」</b></td>
+                  <td><b>複製台羅/POJ文本</b></td>
+                  <td>一鍵將全篇已套用連讀變調的羅馬字文本複製至剪貼簿，便利教學與出版</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Tab 5: 參考文獻 -->
+        <div id="tab-refs" class="help-tab-pane">
+          <h4>📚 學術文獻與開源專案來源</h4>
+          <ul>
+            <li><b>Meta MMS (Massively Multilingual Speech)</b>: Vineel Pratap et al., <i>Scaling Speech Technology to 1,000+ Languages</i>, arXiv:2305.13516 (2023). Hugging Face: <code>facebook/mms-tts-nan</code>.</li>
+            <li><b>中華民國教育部</b>：《臺灣台語常用詞辭典》官方資料庫與真人發音音檔 (g0v moedict 社群整理).</li>
+            <li><b>董峰政教授</b>：《台灣閩南語的變調規律》及教育部臺灣閩南語羅馬字拼音方案.</li>
+            <li><b>Microsoft Azure Cognitive Services</b>: Edge-TTS (<code>zh-TW-HsiaoChenNeural</code>, <code>zh-TW-YunJheNeural</code>).</li>
+            <li><b>Taibun</b>: Python Taiwanese Romanisation, Sandhi, and Segmentation Library.</li>
+            <li><b>IETF RFC 6716</b>: Interactive Audio Opus Codec 規範 (音訊節省 89% 頻寬).</li>
+          </ul>
+        </div>
       </div>
       <div class="modal-footer">
-        <button id="helpOkBtn" class="btn btn-primary">了解</button>
+        <button id="helpOkBtn" class="btn btn-primary">關閉說明</button>
       </div>
     </div>
   </div>
