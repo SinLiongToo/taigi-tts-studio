@@ -7,13 +7,15 @@ mms_engine.py - Meta MMS (Massively Multilingual Speech) 台語 VITS 模型推�
 - 本模組自動在前處理層結合 taigi_sandhi.py：
   1. 漢字/漢羅 -> 台羅/POJ 音節剖析 (G2P)
   2. 套用五調循環 + 入聲對調 + 喉塞音舒聲化變調規則
-  3. 轉化為變調後的標準 POJ 送入 MMS-TTS，徹底消除外國人念經文的機械呆滯感！
+  3. 預設送「本調」POJ（模型訓練文本即為本調書寫，變調由模型自行處理）；
+     可選擇先套用規則變調（apply_sandhi=True）做比較實驗。
 - 支援長篇文章（500+ 字）自動分句推論與波形平滑拼接。
 """
 
 import io
 import os
 import re
+import unicodedata
 import numpy as np
 import torch
 from typing import List, Dict, Any, Optional
@@ -21,6 +23,23 @@ from taigi_sandhi import TaigiTextPipeline, split_article_into_sentences
 from pydub import AudioSegment
 
 MMS_MODEL_ID = "facebook/mms-tts-nan"
+
+# 子句切分：MMS 詞表沒有標點，必須在送進模型前切開，自己補停頓
+CLAUSE_SPLIT_RE = re.compile(r"([，,、；;：:。！？!?…「」『』“”()（）]+|\.(?=\s|$))")
+CLAUSE_PAUSE_MS = 160        # 逗號等句中停頓
+SENTENCE_END_PAUSE_MS = 320  # 句號、問號等句末停頓
+
+
+def _fade_edges(wav: np.ndarray, sr: int, ms: float = 8.0) -> np.ndarray:
+    """子句頭尾各做幾毫秒淡入淡出，避免拼接處出現「啪」一聲"""
+    n = min(len(wav) // 2, int(sr * ms / 1000))
+    if n <= 0:
+        return wav
+    wav = wav.copy()
+    ramp = np.linspace(0.0, 1.0, n, dtype=np.float32)
+    wav[:n] *= ramp
+    wav[-n:] *= ramp[::-1]
+    return wav
 
 
 class MmsTtsEngine:
@@ -35,6 +54,7 @@ class MmsTtsEngine:
         self.tokenizer = None
         self.g2p = TaigiTextPipeline(dialect="south")
         self.sample_rate = 16000
+        self.seed = 0
 
     def _ensure_loaded(self):
         """延遲載入（Lazy Load），避免伺服器啟動時阻塞，並配置多核心極速推論"""
@@ -50,47 +70,78 @@ class MmsTtsEngine:
             self.sample_rate = self.model.config.sampling_rate
             print(f"[MMS-TTS] 模型載入完畢，採樣率: {self.sample_rate}Hz")
 
+    def _vocab_chars(self) -> set:
+        if getattr(self, "_vocab_cache", None) is None:
+            self._ensure_loaded()
+            self._vocab_cache = set(self.tokenizer.get_vocab().keys())
+        return self._vocab_cache
+
     def clean_poj_for_mms(self, poj_text: str) -> str:
         """
-        將 POJ 正規化為 MMS Tokenizer 易於識別的字符：
-        將白話字特殊符號與全形標點標準化，去除不相干符號
+        把 POJ 整理成 MMS 模型「認得」的字元。
+        MMS 台語詞表只有 48 個字元：POJ 字母、部分帶調號字母、o͘ 的點、- 和 '。
+        沒有標點、也沒有鼻化符號 ⁿ —— 不在詞表的字元會被 tokenizer 默默刪掉。
+        這裡先把不認得的帶調號字母拆開 (NFD)，只丟掉不認得的那個符號、保留字母本身。
         """
-        text = poj_text.lower()
-        # 替換特殊全形符號
-        text = text.replace('，', ', ').replace('。', '. ').replace('！', '! ').replace('？', '? ')
-        text = text.replace('；', '; ').replace('、', ', ').replace('：', ': ')
-        # 清除連續多餘空白
-        text = re.sub(r'\s+', ' ', text).strip()
-        return text
+        vocab = self._vocab_chars()
+        text = unicodedata.normalize("NFC", poj_text.lower())
+        out = []
+        for ch in text:
+            if ch in vocab:
+                out.append(ch)
+            elif ch.isspace():
+                out.append(" ")
+            else:
+                out.extend(c for c in unicodedata.normalize("NFD", ch) if c in vocab)
+        text = "".join(out)
+        text = re.sub(r"-{3,}", "--", text)
+        return re.sub(r"\s+", " ", text).strip(" -")
 
-    def synthesize_sentence(self, sentence_text: str, apply_sandhi: bool = True) -> np.ndarray:
-        """
-        合成單一句子 (極速推論模式):
-        使用 torch.inference_mode() 避免梯隊構建，大幅縮短 CPU 耗時。
-        """
-        self._ensure_loaded()
-
-        if apply_sandhi:
-            poj_text = self.g2p.convert_to_sandhi_poj(sentence_text)
-        else:
-            poj_text = self.g2p.convert_to_poj_raw(sentence_text)
-
-        cleaned_poj = self.clean_poj_for_mms(poj_text)
-        if not cleaned_poj:
-            return np.zeros(int(self.sample_rate * 0.2), dtype=np.float32)
-
+    def _infer(self, cleaned_poj: str) -> np.ndarray:
         inputs = self.tokenizer(cleaned_poj, return_tensors="pt").to(self.device)
-
+        # VITS 每次推論帶隨機雜訊；固定種子讓同一句每次聽起來都一樣 (也方便快取與比較)
+        torch.manual_seed(self.seed)
         with torch.inference_mode():
             output = self.model(**inputs)
-            waveform = output.waveform[0].cpu().float().numpy()
+        return output.waveform[0].cpu().float().numpy()
 
-        return waveform
+    def text_to_poj(self, sentence_text: str, apply_sandhi: bool = False) -> str:
+        if apply_sandhi:
+            return self.g2p.convert_to_sandhi_poj(sentence_text)
+        return self.g2p.convert_to_poj_raw(sentence_text)
+
+    def synthesize_sentence(self, sentence_text: str, apply_sandhi: bool = False) -> np.ndarray:
+        """
+        合成單一句子。
+        - 預設送「本調」POJ：MMS 的訓練文本 (白話字聖經) 本來就是寫本調，
+          模型自己學會了念出變調。若先幫它變調，等於變調兩次，聲調會跑掉。
+        - 依標點切成子句分別合成，中間補上停頓。MMS 詞表沒有標點，
+          整句一起送的話，逗號、句號都會被刪掉，變成一口氣念到底。
+        """
+        self._ensure_loaded()
+        poj_text = self.text_to_poj(sentence_text, apply_sandhi)
+
+        pieces = []
+        parts = CLAUSE_SPLIT_RE.split(poj_text)
+        for i in range(0, len(parts), 2):
+            clause = self.clean_poj_for_mms(parts[i])
+            punct = parts[i + 1] if i + 1 < len(parts) else ""
+            if not clause:
+                continue
+            wav = self._infer(clause)
+            pieces.append(_fade_edges(wav, self.sample_rate))
+            pause = SENTENCE_END_PAUSE_MS if re.search(r"[。！？!?.…]", punct) else CLAUSE_PAUSE_MS
+            pieces.append(np.zeros(int(self.sample_rate * pause / 1000), dtype=np.float32))
+
+        if not pieces:
+            return np.zeros(int(self.sample_rate * 0.2), dtype=np.float32)
+        pieces.pop()  # 句尾停頓交給呼叫端 (pause_ms) 決定
+        return np.concatenate(pieces)
 
     def synthesize_article(
         self,
         article_text: str,
-        apply_sandhi: bool = True,
+        apply_sandhi: bool = False,
         pause_ms: int = 300,
         output_file: Optional[str] = None
     ) -> Dict[str, Any]:
@@ -115,10 +166,7 @@ class MmsTtsEngine:
 
         for item in chunks:
             raw_text = item["text"]
-            if apply_sandhi:
-                poj_converted = self.g2p.convert_to_sandhi_poj(raw_text)
-            else:
-                poj_converted = self.g2p.convert_to_poj_raw(raw_text)
+            poj_converted = self.text_to_poj(raw_text, apply_sandhi)
 
             sentence_poj_list.append({
                 "index": item["index"],

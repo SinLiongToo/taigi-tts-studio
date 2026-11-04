@@ -82,6 +82,10 @@ def get_mms_engine():
     return mms_engine_instance
 
 
+def _mms_sandhi_kwargs(req) -> Dict[str, Any]:
+    return {} if req.apply_sandhi is None else {"apply_sandhi": bool(req.apply_sandhi)}
+
+
 class TTSRequest(BaseModel):
     text: str
     model: str = "edge"  # "edge" | "mms"
@@ -89,7 +93,8 @@ class TTSRequest(BaseModel):
     rate: Optional[str] = "+0%"
     pitch: Optional[str] = "+0Hz"
     volume: Optional[str] = "+0%"
-    apply_sandhi: Optional[bool] = True
+    # None = 用 MMS 引擎預設（送本調，讓模型自己變調）；True = 先套規則變調再送
+    apply_sandhi: Optional[bool] = None
     pause_ms: Optional[int] = 300
 
 
@@ -105,9 +110,9 @@ async def list_available_models():
         "models": [
             {
                 "id": "edge",
-                "name": "Microsoft Edge-TTS 類神經語音",
+                "name": "Microsoft Edge-TTS 臺灣華語語音",
                 "type": "neural",
-                "description": "自然流暢，長文朗讀首選，支援多種台語/臺灣華語混讀女聲與男聲",
+                "description": "微軟沒有台語語音：這是臺灣華語 (zh-TW)，台語漢字會以華語讀音唸出",
                 "voices": [
                     {"id": k, "name": v["name"], "gender": v["gender"]}
                     for k, v in SUPPORTED_VOICES.items()
@@ -118,7 +123,7 @@ async def list_available_models():
                 "id": "mms",
                 "name": "Meta MMS-TTS (facebook/mms-tts-nan)",
                 "type": "vits_neural",
-                "description": "開源 VITS 端到端模型 (~36M 參數)，本系統整合連讀變調 POJ Pipeline 消除生硬朗讀感",
+                "description": "開源 VITS 端到端台語模型 (~36M 參數)；送入本調白話字，由模型自行處理連讀變調",
                 "voices": [
                     {"id": "default", "name": "Meta MMS 台語單發音人 (VITS)", "gender": "Male"}
                 ],
@@ -246,7 +251,7 @@ async def synthesize_text(req: TTSRequest):
         engine = get_mms_engine()
         result = engine.synthesize_article(
             article_text=text,
-            apply_sandhi=bool(req.apply_sandhi),
+            **_mms_sandhi_kwargs(req),
             pause_ms=req.pause_ms or 300
         )
         return Response(
@@ -293,7 +298,7 @@ async def synthesize_text_json(req: TTSRequest):
             engine = get_mms_engine()
             result = engine.synthesize_article(
                 article_text=text,
-                apply_sandhi=bool(req.apply_sandhi),
+                **_mms_sandhi_kwargs(req),
                 pause_ms=req.pause_ms or 300
             )
             audio_b64 = base64.b64encode(result["audio_bytes"]).decode("utf-8")

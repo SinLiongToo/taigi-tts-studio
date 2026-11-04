@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-edge_engine.py - 微軟 Edge-TTS 台語/臺灣語音合成引擎
+edge_engine.py - 微軟 Edge-TTS 臺灣華語語音合成引擎
 支援長篇 500+ 字文章自動分句非同步合成、音訊無縫拼接、調控語速語調。
-可調用的高品質聲音：
-- zh-TW-HsiaoChenNeural (曉臻，女聲，台語/國語自然混讀表現極佳)
+
+注意：微軟沒有台語 (nan-TW) 語音。以下都是「臺灣華語」語音，
+台語漢字會被用華語讀音唸出來 —— 這不是台語發音，只適合華語朗讀或對照。
+可調用的聲音：
+- zh-TW-HsiaoChenNeural (曉臻，女聲)
 - zh-TW-YunJheNeural (雲哲，男聲，穩重大方)
 - zh-TW-HsiaoYuNeural (曉雨，女聲，輕快活潑)
 """
@@ -21,19 +24,19 @@ SUPPORTED_VOICES = {
         "id": "zh-TW-HsiaoChenNeural",
         "name": "曉臻 (HsiaoChen - 自然柔和女聲)",
         "gender": "Female",
-        "lang": "台語/臺灣華語"
+        "lang": "臺灣華語 (zh-TW)"
     },
     "YunJhe": {
         "id": "zh-TW-YunJheNeural",
         "name": "雲哲 (YunJhe - 穩重知性男聲)",
         "gender": "Male",
-        "lang": "台語/臺灣華語"
+        "lang": "臺灣華語 (zh-TW)"
     },
     "HsiaoYu": {
         "id": "zh-TW-HsiaoYuNeural",
         "name": "曉雨 (HsiaoYu - 清脆活力女聲)",
         "gender": "Female",
-        "lang": "台語/臺灣華語"
+        "lang": "臺灣華語 (zh-TW)"
     }
 }
 

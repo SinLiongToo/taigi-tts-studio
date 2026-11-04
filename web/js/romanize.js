@@ -88,7 +88,7 @@ const Romanize = (() => {
   function skeletonToPoj(skeleton) {
     let s = skeletonToPojLetters(skeleton);
     s = s.replace(/oo/g, 'o' + DOT);
-    s = s.replace(/nn$/, NASAL);
+    s = s.replace(/nn(h?)$/, NASAL + '$1'); // -nn → ⁿ，-nnh → ⁿh
     return s;
   }
 
@@ -108,8 +108,9 @@ const Romanize = (() => {
     else if (/ui/i.test(letters)) { idx = letters.toLowerCase().indexOf('ui'); insertAfter = idx + 2; }
     else if (findFirst('i') >= 0) { idx = findFirst('i'); insertAfter = idx + 1; }
     else if (findFirst('u') >= 0) { idx = findFirst('u'); insertAfter = idx + 1; }
-    else if (findFirst('m') >= 0) { idx = findFirst('m'); insertAfter = idx + 1; }
+    // 成音節 ng 標在 n（門 mn̂g），所以要比單獨的 m 先檢查
     else if (letters.toLowerCase().indexOf('ng') >= 0) { idx = letters.toLowerCase().indexOf('ng'); insertAfter = idx + 1; }
+    else if (findFirst('m') >= 0) { idx = findFirst('m'); insertAfter = idx + 1; }
 
     if (idx < 0) return letters; // 找不到核心母音，原樣傳回
     return (letters.slice(0, insertAfter) + mark + letters.slice(insertAfter)).normalize('NFC');

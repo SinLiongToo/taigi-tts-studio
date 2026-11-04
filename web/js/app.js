@@ -320,7 +320,8 @@ Tse1 to7 si7 Tai5-uan5 e5 tsa2-tshi7-a2, tshiong1-buan2 thoo2-te7 e5 sinn3-mia7-
       `;
     } else if (currentModel === 'web_speech') {
       activeModelTag.textContent = 'Web Speech API (本機語音)';
-      modelHint.textContent = '使用瀏覽器與本機作業系統內建語音引擎（通常為微軟 HanHan 國語）。';
+      modelHint.textContent = '使用瀏覽器內建語音（臺灣華語 zh-TW）。瀏覽器沒有台語語音，漢字會用華語讀音唸，僅供快速預覽。';
+      if ('speechSynthesis' in window) speechSynthesis.getVoices(); // 讓語音清單提早載入
       voiceGroup.style.display = 'none';
     }
   }
@@ -1131,7 +1132,6 @@ Tse1 to7 si7 Tai5-uan5 e5 tsa2-tshi7-a2, tshiong1-buan2 thoo2-te7 e5 sinn3-mia7-
             model: model,
             voice: voiceSelect.value,
             rate: formatEdgeRate(speedRange.value),
-            apply_sandhi: sandhiToggle.checked,
             pause_ms: parseInt(pauseRange.value, 10)
           })
         });
@@ -1255,6 +1255,7 @@ Tse1 to7 si7 Tai5-uan5 e5 tsa2-tshi7-a2, tshiong1-buan2 thoo2-te7 e5 sinn3-mia7-
   }
 
   // 向後端合成單句音檔 (有快取：同樣的句子與設定不重算)
+  // 不送 apply_sandhi：MMS 預設吃「本調」白話字，由模型自己變調 (變調開關只影響畫面上的拼音顯示)
   function fetchSentenceBlob(text) {
     const key = sentenceCacheKey(text);
     if (sentenceBlobCache.has(key)) return sentenceBlobCache.get(key);
@@ -1266,7 +1267,6 @@ Tse1 to7 si7 Tai5-uan5 e5 tsa2-tshi7-a2, tshiong1-buan2 thoo2-te7 e5 sinn3-mia7-
         model: modelSelect.value,
         voice: voiceSelect.value,
         rate: formatEdgeRate(speedRange.value),
-        apply_sandhi: sandhiToggle.checked,
         pause_ms: 100
       })
     }).then(res => {
@@ -1346,8 +1346,7 @@ Tse1 to7 si7 Tai5-uan5 e5 tsa2-tshi7-a2, tshiong1-buan2 thoo2-te7 e5 sinn3-mia7-
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           text: hanzi || reading,
-          model: 'mms',
-          apply_sandhi: true
+          model: 'mms'
         })
       }).then(res => {
         if (!res.ok) throw new Error('合成失敗');
@@ -1499,29 +1498,136 @@ Tse1 to7 si7 Tai5-uan5 e5 tsa2-tshi7-a2, tshiong1-buan2 thoo2-te7 e5 sinn3-mia7-
     return { url: null, parts };
   }
 
+  // ---------- 教育部錄音：略過前後空白 + 預先載入，讓詞與詞緊密相連 ----------
+  // 教育部音檔前後各有 60～670ms 空白，直接串接會一頓一頓。
+  // js/moe_trim.json 由 tools/measure_moe_silence.py 離線量好：{ id: [前空白ms, 後空白ms] }
+  let moeTrimMap = null;
+  let moeTrimLoading = null;
+  function loadMoeTrim() {
+    if (moeTrimMap) return Promise.resolve(moeTrimMap);
+    if (!moeTrimLoading) {
+      moeTrimLoading = fetch('js/moe_trim.json')
+        .then(r => (r.ok ? r.json() : {}))
+        .catch(() => ({}))
+        .then(m => (moeTrimMap = m || {}));
+    }
+    return moeTrimLoading;
+  }
+
+  function moeTrimFor(url) {
+    const m = /\/audio\/t\/(\d+)\.mp3/.exec(url || '');
+    const t = m && moeTrimMap ? moeTrimMap[m[1]] : null;
+    return t ? { lead: t[0] / 1000, tail: t[1] / 1000 } : { lead: 0, tail: 0 };
+  }
+
+  const preloadedClips = new Map(); // url -> 已開始下載的 Audio
+  function preloadClip(url) {
+    if (!url || preloadedClips.has(url)) return;
+    const a = new Audio();
+    a.preload = 'auto';
+    a.src = url;
+    a.load();
+    preloadedClips.set(url, a);
+    if (preloadedClips.size > 30) preloadedClips.delete(preloadedClips.keys().next().value);
+  }
+  function takeClip(url) {
+    const a = preloadedClips.get(url);
+    if (a) {
+      preloadedClips.delete(url);
+      return a;
+    }
+    const b = new Audio();
+    b.preload = 'auto';
+    b.src = url;
+    return b;
+  }
+
+  // 播一個教育部音檔：從語音開頭播，播到語音結尾就放行 (不等後面的空白)
+  function playTrimmedClip(url, rate = 1.0, session = playSession) {
+    return new Promise((resolve) => {
+      if (!url || session !== playSession) return resolve();
+      const a = takeClip(url);
+      const { lead, tail } = moeTrimFor(url);
+      a.playbackRate = rate;
+      let done = false;
+      let stallTimer = null;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        clearTimeout(stallTimer);
+        if (pendingAudioResolve === finish) pendingAudioResolve = null;
+        if (currentAudio === a) currentAudio = null;
+        a.pause();
+        resolve();
+      };
+      pendingAudioResolve = finish;
+      currentAudio = a; // 讓「暫停 / 繼續」按鈕也能控制
+      const watch = () => {
+        if (done) return;
+        const d = a.duration;
+        if (d && isFinite(d) && !a.paused && a.currentTime >= d - tail) return finish();
+        setTimeout(watch, 10);
+      };
+      const start = () => {
+        if (done) return;
+        clearTimeout(stallTimer);
+        try { if (lead > 0) a.currentTime = lead; } catch (_) { /* 尚不可 seek 就從頭播 */ }
+        a.play().then(watch).catch((err) => {
+          console.warn('播放被瀏覽器限制或失敗:', err);
+          finish();
+        });
+      };
+      a.onended = finish;
+      a.onerror = () => {
+        console.warn('音檔載入失敗:', url);
+        finish();
+      };
+      // 網路卡住時不要讓整篇朗讀停住
+      stallTimer = setTimeout(() => { if (a.readyState < 1) finish(); }, 8000);
+      if (a.readyState >= 1) start();
+      else a.addEventListener('loadedmetadata', start, { once: true });
+    });
+  }
+
+  function sentenceClipPlan(sIdx) {
+    const item = parsedSentences[sIdx];
+    const plan = [];
+    for (const t of (item && item.tokens) || []) {
+      if (t.type !== 'word') continue;
+      const { url, parts } = resolveTokenAudio(t);
+      const urls = url ? [url] : parts;
+      plan.push({ t, urls });
+    }
+    return plan;
+  }
+
   // 教育部辭典真人錄音：整句依序朗讀各詞 (每個詞都有精確的「唸到哪裡」高亮)
   async function playSentenceViaMoeAudio(sIdx, session = playSession) {
     if (sIdx < 0 || sIdx >= parsedSentences.length) return;
-    const tokens = parsedSentences[sIdx].tokens || [];
+    await loadMoeTrim();
     const rate = parseFloat(speedRange.value);
+    const plan = sentenceClipPlan(sIdx);
+    const allUrls = plan.flatMap(p => p.urls);
+    // 先把本句前幾個音檔與下一句開頭載入，播放時就不必等網路
+    allUrls.slice(0, 4).forEach(preloadClip);
+    if (sIdx + 1 < parsedSentences.length) {
+      sentenceClipPlan(sIdx + 1).flatMap(p => p.urls).slice(0, 2).forEach(preloadClip);
+    }
 
-    for (const t of tokens) {
+    let pos = 0;
+    for (const { t, urls } of plan) {
       if (session !== playSession) break;
-      if (t.type !== 'word') continue;
-
       setSpeakingWord(t, sIdx);
-
-      const { url, parts } = resolveTokenAudio(t);
-      if (url) {
-        await playAudioUrl(url, rate, session);
-      } else if (parts.length) {
-        for (const subUrl of parts) {
-          if (session !== playSession) break;
-          await playAudioUrl(subUrl, rate, session);
-        }
-      } else {
+      if (!urls.length) {
         // 查無音檔：仍停留一下讓使用者看得到唸到哪 (詞塊上會標示)
         await new Promise(r => setTimeout(r, 220));
+        continue;
+      }
+      for (const u of urls) {
+        if (session !== playSession) break;
+        allUrls.slice(pos + 1, pos + 4).forEach(preloadClip);
+        pos++;
+        await playTrimmedClip(u, rate, session);
       }
     }
     if (session === playSession) setSpeakingWord(null);
@@ -1536,6 +1642,19 @@ Tse1 to7 si7 Tai5-uan5 e5 tsa2-tshi7-a2, tshiong1-buan2 thoo2-te7 e5 sinn3-mia7-
       } else if (modelSelect.value === 'web_speech' && 'speechSynthesis' in window) {
         const utter = new SpeechSynthesisUtterance(text);
         utter.rate = parseFloat(speedRange.value);
+        // 沒指定語言時，很多裝置會用英文語音去唸漢字 → 聲音非常怪。
+        // 瀏覽器沒有台語語音，最接近的是臺灣華語 (zh-TW)；找不到才退到其他中文語音。
+        utter.lang = 'zh-TW';
+        const voices = speechSynthesis.getVoices() || [];
+        const norm = v => (v.lang || '').replace('_', '-').toLowerCase();
+        const pick = voices.find(v => /^nan/.test(norm(v)))
+          || voices.find(v => norm(v) === 'zh-tw')
+          || voices.find(v => norm(v).startsWith('zh-hant') || norm(v) === 'zh-hk')
+          || voices.find(v => norm(v).startsWith('zh'));
+        if (pick) {
+          utter.voice = pick;
+          utter.lang = pick.lang;
+        }
         // 瀏覽器回報目前唸到的字元位置 → 對應到詞塊高亮
         utter.onboundary = (ev) => {
           if (session !== playSession) return;
@@ -1636,7 +1755,6 @@ Tse1 to7 si7 Tai5-uan5 e5 tsa2-tshi7-a2, tshiong1-buan2 thoo2-te7 e5 sinn3-mia7-
             model: model,
             voice: voiceSelect.value,
             rate: formatEdgeRate(speedRange.value),
-            apply_sandhi: sandhiToggle.checked,
             pause_ms: parseInt(pauseRange.value, 10)
           })
         });

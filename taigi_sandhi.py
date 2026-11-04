@@ -141,10 +141,11 @@ def place_tone_mark(letters: str, tone: int) -> str:
         idx = low.index('i')
     elif 'u' in low:
         idx = low.index('u')
+    elif 'ng' in low:
+        # 成音節 ng：標在 n 上（門 mn̂g、黃 n̂g）
+        idx = low.index('ng')
     elif 'm' in low:
         idx = low.index('m')
-    elif 'ng' in low:
-        idx = low.index('n')
     else:
         # fallback: 標在第一個字母
         idx = 0
@@ -169,7 +170,7 @@ def skeleton_to_poj(skeleton: str, tone: int) -> str:
     s = re.sub(r'ing$', 'eng', s)
     s = re.sub(r'ik$', 'ek', s)
     s = re.sub(r'oo', 'o' + DOT_ABOVE_RIGHT, s)
-    s = re.sub(r'nn$', NASAL_MARK, s)
+    s = re.sub(r'nn(h?)$', NASAL_MARK + r'\1', s)  # -nn → ⁿ，-nnh → ⁿh
     return place_tone_mark(s, tone)
 
 

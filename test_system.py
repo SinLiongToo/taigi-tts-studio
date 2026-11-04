@@ -153,6 +153,38 @@ class TestTaigiTTS(unittest.TestCase):
         self.assertIsNotNone(words[0].get("audio_url"))
         self.assertIn("08630", words[0]["audio_url"])  # 滋味 official ID
 
+    def test_tone_mark_placement(self):
+        """調號位置：成音節 ng 標在 n（門 mn̂g），-nnh 轉白話字為 ⁿh"""
+        self.assertEqual(skeleton_to_poj("mng", 5), "mn̂g")
+        self.assertEqual(skeleton_to_poj("ng", 7), "n̄g")
+        self.assertEqual(skeleton_to_poj("hm", 5), "hm̂")
+        self.assertEqual(skeleton_to_poj("hannh", 4), "haⁿh")
+        self.assertEqual(skeleton_to_poj("sinn", 1), "siⁿ")
+
+
+class TestMmsTextCleaning(unittest.TestCase):
+    """MMS 詞表只有 48 個字元（無標點、無 ⁿ）：確認送進模型的字串只含詞表字元，且字母不會被整個刪掉"""
+
+    @classmethod
+    def setUpClass(cls):
+        try:
+            from transformers import AutoTokenizer
+            from mms_engine import MmsTtsEngine
+            tok = AutoTokenizer.from_pretrained("facebook/mms-tts-nan")
+        except Exception as e:  # 沒裝 transformers 或離線無快取
+            raise unittest.SkipTest(f"MMS tokenizer 不可用: {e}")
+        cls.engine = MmsTtsEngine.__new__(MmsTtsEngine)
+        cls.engine._vocab_cache = set(tok.get_vocab().keys())
+
+    def test_only_vocab_chars(self):
+        out = self.engine.clean_poj_for_mms("Goá m̀-chai-iáⁿ, chiàⁿ-chhiú!")
+        self.assertTrue(set(out) <= self.engine._vocab_cache, out)
+        self.assertEqual(out, "goá m-chai-iá chià-chhiú")
+
+    def test_keeps_supported_marks(self):
+        self.assertEqual(self.engine.clean_poj_for_mms("chia̍h-pá bē?"), "chia̍h-pá bē")
+        self.assertEqual(self.engine.clean_poj_for_mms("ô͘-á"), "ô͘-á")
+
 
 if __name__ == '__main__':
     unittest.main()
