@@ -11,6 +11,8 @@ optional FastAPI backend (`server.py`) for Meta MMS and Edge-TTS.
 ## Rules
 - `web/` is a copy of the root site (`index.html`, `style.css`, `js/*`) served by `server.py`.
   After editing any root frontend file, copy it to `web/` so both stay identical.
+- When you change the website, update the 「最後更新」 date in the `index.html` header
+  (`<p class="app-updated">`, both text and `datetime`).
 - Do not describe Edge-TTS or the browser voice as Taiwanese. Both are Mandarin (zh-TW) only.
 - Do not claim a voice-quality improvement without listening or measuring. The existing
   `verify_voice.py` only checks loudness and speed, not pronunciation.

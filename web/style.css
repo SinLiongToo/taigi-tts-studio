@@ -137,6 +137,13 @@ body {
   color: var(--text-muted);
 }
 
+.app-updated {
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.85;
+  margin-top: 2px;
+}
+
 .header-right {
   display: flex;
   align-items: center;
