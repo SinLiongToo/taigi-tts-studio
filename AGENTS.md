@@ -2,6 +2,7 @@
 
 Read `docs/PROJECT_MEMORY.md` before starting. Append durable facts, decisions and gotchas
 there (one or two lines, ending `YYYY-MM-DD · <tool>`), and fix or delete entries that turn out wrong.
+Whenever you change that file, also update the **Last updated** line at its top.
 
 ## Project
 Taigi (Taiwanese Hokkien) TTS studio. Static site at the repo root (GitHub Pages) plus an

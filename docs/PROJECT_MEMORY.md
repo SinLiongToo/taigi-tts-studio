@@ -1,5 +1,7 @@
 # Project memory (shared by Claude Code, Antigravity and humans)
 
+**Last updated:** 2026-11-05 · Claude Code
+
 ## Verified facts
 - `facebook/mms-tts-nan` vocab has only 48 chars: POJ letters, some precomposed toned letters, combining U+030D/U+0304/U+0302/U+0358, `-`, `'`, space. No punctuation, no `ⁿ`, no combining grave/acute. Anything else is silently dropped by the tokenizer. Source: model `vocab.json`. 2026-11-04 · Claude Code
 - 教育部 audio clips (`r2-assets.moedict.tw/audio/t/<id>.mp3`) have 60–670 ms silence before/after speech (avg ~320 ms per clip total). 2026-11-04 · Claude Code
